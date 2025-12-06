@@ -1,0 +1,85 @@
+<script>
+  export let isOpen = false;
+  export let onClose;
+  export let onSave;
+
+  let nombre_meta = '';
+  let monto_objetivo = '';
+  let fecha_limite = new Date().toISOString().split('T')[0];
+
+  $: if (!isOpen) {
+    nombre_meta = '';
+    monto_objetivo = '';
+    fecha_limite = new Date().toISOString().split('T')[0];
+  }
+
+  const handleSubmit = () => {
+    if (!nombre_meta || !monto_objetivo || !fecha_limite) {
+        alert('Por favor complete los campos obligatorios');
+        return;
+    }
+
+    const payload = {
+        nombre_meta,
+        monto_objetivo: parseFloat(monto_objetivo),
+        fecha_limite
+    };
+    
+    onSave(payload);
+  };
+</script>
+
+{#if isOpen}
+  <div class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm animate-fade-in">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 relative">
+      <button on:click={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white" aria-label="Cerrar">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+      <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">Nueva Meta de Ahorro</h3>
+      <form on:submit|preventDefault={handleSubmit} class="space-y-4">
+        <div>
+          <label for="nombre_meta" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre de la Meta</label>
+          <input 
+            id="nombre_meta"
+            type="text" 
+            bind:value={nombre_meta} 
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none" 
+            placeholder="Ej: Viaje a Japón"
+            required
+          >
+        </div>
+        
+        <div>
+          <label for="monto_objetivo" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Monto Objetivo ($)</label>
+          <input 
+            id="monto_objetivo"
+            type="number" 
+            bind:value={monto_objetivo} 
+            step="0.01"
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none text-lg font-bold" 
+            placeholder="0.00"
+            required
+          >
+        </div>
+
+        <div>
+          <label for="fecha_limite" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Fecha Límite</label>
+          <input 
+            id="fecha_limite"
+            type="date" 
+            bind:value={fecha_limite} 
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 text-sm"
+            required
+          >
+        </div>
+
+        <button 
+            type="submit" 
+            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        >
+            Crear Meta
+        </button>
+      </form>
+    </div>
+  </div>
+{/if}
