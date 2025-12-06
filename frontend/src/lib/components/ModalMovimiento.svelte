@@ -9,7 +9,7 @@
 
   let form = {
     tipo: 'gasto',
-    monto: 0,
+    monto: null,
     cuenta_id: 0,
     categoria_id: 0,
     fecha: new Date().toISOString().split('T')[0],
@@ -23,20 +23,11 @@
             monto: editingTransaction.monto,
             cuenta_id: editingTransaction.cuenta_id,
             categoria_id: editingTransaction.categoria_id,
-            // Ensure fecha is YYYY-MM-DD
             fecha: editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             descripcion: editingTransaction.descripcion
         };
     } else {
-        // Reset defaults if opening fresh and not editing
-        if (!form.monto && !form.cuenta_id) { 
-             form.tipo = 'gasto';
-             form.fecha = new Date().toISOString().split('T')[0];
-             form.monto = 0;
-             form.cuenta_id = 0;
-             form.categoria_id = 0;
-             form.descripcion = '';
-        }
+        // Keep current state if user is typing, or reset if it was a fresh open
     }
   }
 
@@ -44,7 +35,7 @@
     // Reset form when closed
     form = {
         tipo: 'gasto',
-        monto: 0,
+        monto: null,
         cuenta_id: 0,
         categoria_id: 0,
         fecha: new Date().toISOString().split('T')[0],

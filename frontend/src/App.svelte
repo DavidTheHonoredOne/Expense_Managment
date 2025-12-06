@@ -119,22 +119,48 @@
     const movs = await api.getMovimientos().catch(err => []);
     
     // Process for Donut (Gastos por Categoria)
-    const gastos = movs.filter(m => m.tipo === 'gasto' || m.tipo === 'Gasto'); // Handle case
+    const gastos = movs.filter(m => m.tipo === 'gasto' || m.tipo === 'Gasto'); 
     const gastosPorCat = {};
     gastos.forEach(g => {
         const catName = g.nombre_categoria || categorias.find(c => c.categoria_id === g.categoria_id)?.nombre_categoria || 'Otros';
         gastosPorCat[catName] = (gastosPorCat[catName] || 0) + parseFloat(g.monto);
     });
 
+    // Process for Bar (Balance Mensual)
+    const monthlyData = {};
+    movs.forEach(m => {
+        if (!m.fecha) return;
+        const date = new Date(m.fecha);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+        if (!monthlyData[key]) monthlyData[key] = { ingresos: 0, gastos: 0 };
+        
+        const tipo = m.tipo?.toLowerCase();
+        if (tipo === 'ingreso') {
+            monthlyData[key].ingresos += parseFloat(m.monto);
+        } else if (tipo === 'gasto') {
+            monthlyData[key].gastos += parseFloat(m.monto);
+        }
+    });
+
+    // Sort by date and take last 6 months
+    const sortedKeys = Object.keys(monthlyData).sort().slice(-6);
+    const chartLabels = sortedKeys.map(key => {
+        const [year, month] = key.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        return date.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' });
+    });
+    const ingresosData = sortedKeys.map(key => monthlyData[key].ingresos);
+    const gastosData = sortedKeys.map(key => monthlyData[key].gastos);
+
     // Render Charts
     setTimeout(() => {
         if (activeTab === 'dashboard' && donutCanvas && barCanvas) {
-            renderCharts(gastosPorCat);
+            renderCharts(gastosPorCat, chartLabels, ingresosData, gastosData);
         }
     }, 100);
   }
 
-  function renderCharts(gastosPorCat) {
+  function renderCharts(gastosPorCat, barLabels, barIngresos, barGastos) {
     if (donutChartInstance) donutChartInstance.destroy();
     if (barChartInstance) barChartInstance.destroy();
 
@@ -161,14 +187,14 @@
         }
     });
 
-    // Bar (Dummy for now)
+    // Bar Chart
     barChartInstance = new Chart(barCanvas, {
         type: 'bar',
         data: {
-            labels: ['Ene', 'Feb', 'Mar'],
+            labels: barLabels && barLabels.length > 0 ? barLabels : ['Sin datos'],
             datasets: [
-                { label: 'Ingresos', data: [2000000, 2500000, 2200000], backgroundColor: '#14b8a6' },
-                { label: 'Gastos', data: [1800000, 1050000, 2000000], backgroundColor: '#f43f5e' }
+                { label: 'Ingresos', data: barIngresos && barIngresos.length > 0 ? barIngresos : [0], backgroundColor: '#14b8a6' },
+                { label: 'Gastos', data: barGastos && barGastos.length > 0 ? barGastos : [0], backgroundColor: '#f43f5e' }
             ]
         },
         options: { 
