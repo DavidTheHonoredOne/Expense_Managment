@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
+import os
 
 import models, schemas, security
 from database import engine, get_db
@@ -14,9 +15,19 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Expense Management API")
 
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://expense-managment-22pm.onrender.com",
+]
+
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
