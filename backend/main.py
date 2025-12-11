@@ -18,7 +18,8 @@ app = FastAPI(title="Expense Management API")
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://expense-managment-22pm.onrender.com",
+    "https://expense-managment-22pm.onrender.com"
+    "https://expense-managment-iota.vercel.app",
 ]
 
 frontend_url = os.getenv("FRONTEND_URL")
