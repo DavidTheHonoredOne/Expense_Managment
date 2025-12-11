@@ -15,13 +15,18 @@ def crear_meta(
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
     try:
+        fecha_inicio_real = meta.fecha_inicio or datetime.datetime.now()
+        fecha_fin_real = meta.fecha_fin
+        if not fecha_fin_real:
+            fecha_fin_real = fecha_inicio_real + datetime.timedelta(days=365) # Default to 1 year
+
         nueva_meta = models.Meta(
             usuario_id=current_user.usuario_id,
             nombre_meta=meta.nombre_meta,
             monto_objetivo=meta.monto_objetivo,
             monto_actual=0,
-            fecha_inicio=meta.fecha_inicio or datetime.datetime.now(),
-            fecha_fin=meta.fecha_fin,
+            fecha_inicio=fecha_inicio_real,
+            fecha_fin=fecha_fin_real,
             estado=True
         )
         db.add(nueva_meta)
@@ -32,7 +37,7 @@ def crear_meta(
         print(f"Error al crear meta: {e}")
         raise HTTPException(status_code=500, detail=f"Error interno al crear meta: {e}")
 
-@router.get("") # Changed from "/" to ""
+@router.get("") 
 def obtener_metas(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
