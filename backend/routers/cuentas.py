@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 import models, schemas, security
 from database import get_db
+import datetime # Import datetime
 
 router = APIRouter(prefix="/cuentas", tags=["cuentas"])
 
@@ -23,27 +25,48 @@ def crear_cuenta(
         nombre_cuenta=cuenta.nombre_cuenta,
         usuario_id=current_user.usuario_id,
         saldo_actual=cuenta.saldo_inicial
-        # tipo field is optional in schema but usually present. Let's check schema.
-        # schemas.CuentaBase has tipo: Optional[str]
-        # models.Cuenta does NOT seem to have 'tipo' column in the `models.py` I read earlier?
-        # Let's check `models.py` content again from history.
     )
-    # models.py for Cuenta:
-    # cuenta_id, usuario_id, nombre_cuenta, saldo_actual.
-    # NO 'tipo' column in models.py for Cuenta!
-    # But schemas.py has 'tipo'.
-    # I should strictly follow models.py or add the column.
-    # Since I cannot easily migrate DB schema without Alembic (and I don't want to break things if I can't run migrations easily),
-    # I will ignore 'tipo' if it's not in the model, OR I assumed it was there.
-    # Let's check `models.py` content I read.
-    # `class Cuenta(Base): ... nombre_cuenta, saldo_actual`. No `tipo`.
-    # `class Categoria(Base): ... tipo`.
-    
-    # So for Cuenta, I won't save `tipo`.
-    
     db.add(nueva_cuenta)
     db.commit()
     db.refresh(nueva_cuenta)
+
+    if cuenta.saldo_inicial > 0:
+        # Buscar una categoría para "Saldo Inicial" o "General"
+        categoria_inicial = db.query(models.Categoria).filter(
+            models.Categoria.usuario_id == current_user.usuario_id,
+            func.lower(models.Categoria.nombre_categoria).in_(["saldo inicial", "general", "otros"])
+        ).first()
+
+        if not categoria_inicial:
+            # Si no se encuentra, busca la primera de tipo Ingreso
+            categoria_inicial = db.query(models.Categoria).filter(
+                models.Categoria.usuario_id == current_user.usuario_id,
+                func.lower(models.Categoria.tipo) == "ingreso"
+            ).first()
+        
+        if not categoria_inicial:
+            # Si aún no existe, crea una por defecto
+            categoria_inicial = models.Categoria(
+                usuario_id=current_user.usuario_id,
+                nombre_categoria="Saldo Inicial",
+                tipo="Ingreso"
+            )
+            db.add(categoria_inicial)
+            db.flush() # Flush to get categoria_id
+
+        nuevo_movimiento = models.Movimiento(
+            usuario_id=current_user.usuario_id,
+            cuenta_id=nueva_cuenta.cuenta_id,
+            categoria_id=categoria_inicial.categoria_id,
+            tipo="Ingreso",
+            monto=cuenta.saldo_inicial,
+            descripcion="Saldo Inicial de la cuenta",
+            fecha=datetime.datetime.now()
+        )
+        db.add(nuevo_movimiento)
+        db.commit() # Commit the movement as well
+        db.refresh(nuevo_movimiento)
+
     return nueva_cuenta
 
 @router.delete("/{cuenta_id}")

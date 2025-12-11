@@ -8,25 +8,30 @@ import schemas, models, security
 
 router = APIRouter(prefix="/metas", tags=["metas"])
 
-@router.post("/", response_model=schemas.Meta)
+@router.post("", response_model=schemas.Meta)
 def crear_meta(
     meta: schemas.MetaCreate, 
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
-    nueva_meta = models.Meta(
-        usuario_id=current_user.usuario_id,
-        nombre_meta=meta.nombre_meta,
-        monto_objetivo=meta.monto_objetivo,
-        monto_actual=0,
-        fecha_inicio=meta.fecha_inicio or datetime.datetime.now(),
-        fecha_fin=meta.fecha_fin,
-        estado=True
-    )
-    db.add(nueva_meta)
-    db.commit()
-    db.refresh(nueva_meta)
-    return nueva_meta
+    try:
+        nueva_meta = models.Meta(
+            usuario_id=current_user.usuario_id,
+            nombre_meta=meta.nombre_meta,
+            monto_objetivo=meta.monto_objetivo,
+            monto_actual=0,
+            fecha_inicio=meta.fecha_inicio or datetime.datetime.now(),
+            fecha_fin=meta.fecha_fin,
+            estado=True
+        )
+        db.add(nueva_meta)
+        db.commit()
+        db.refresh(nueva_meta)
+        return nueva_meta
+    except Exception as e:
+        print(f"Error al crear meta: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno al crear meta: {e}")
+
 
 @router.get("/", response_model=List[schemas.Meta])
 def obtener_metas(
@@ -57,20 +62,16 @@ def abonar_meta(
         raise HTTPException(status_code=400, detail="El monto a abonar debe ser mayor que cero")
 
     # Buscar una categoría por defecto para abonos a metas. Si no existe, crearla o usar una genérica.
-    # Para simplificar, buscamos una categoría llamada 'Abono a Meta' o 'Transferencia'.
-    # En un sistema real, podrías tener una ID de categoría configurada para esto.
     categoria_abono = db.query(models.Categoria).filter(
         models.Categoria.usuario_id == current_user.usuario_id,
-        func.lower(models.Categoria.nombre_categoria) == 'abono a meta'
+        func.lower(models.Categoria.nombre_categoria) == "abono a meta"
     ).first()
 
     if not categoria_abono:
-        # Si no existe, crea una. O podrías decidir usar una categoría de gasto genérica.
-        # Para este ejemplo, crearemos una si no existe.
         categoria_abono = models.Categoria(
             usuario_id=current_user.usuario_id,
             nombre_categoria="Abono a Meta",
-            tipo="Gasto" # O "Transferencia" si se maneja como tal
+            tipo="Gasto"
         )
         db.add(categoria_abono)
         db.flush() # Flush to get categoria_id before commit
