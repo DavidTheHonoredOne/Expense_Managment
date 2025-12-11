@@ -85,7 +85,9 @@ export const api = {
   // Metas
   getMetas: () => request('/metas'),
   createMeta: (data) => request('/metas', 'POST', data),
-  abonarMeta: (metaId, monto) => request(`/metas/${metaId}/abonar`, 'POST', { monto }), 
+  abonarMeta: (metaId, data) => request(`/metas/${metaId}/abonar`, 'POST', data),
+  updateMeta: (id, data) => request(`/metas/${id}`, 'PUT', data),
+  deleteMeta: (id) => request(`/metas/${id}`, 'DELETE'),
 
   // Usuarios (Perfil)
   getProfile: () => request('/usuarios/me'),

@@ -46,10 +46,19 @@
   let isRegistering = false;
   let authError = '';
   let name = ''; // For registration
+  let isLoading = false; // For login UX
   
-  // Forgot Password
-  let isForgotPassword = false;
-  let resetEmail = '';
+  $: darkMode = $theme;
+
+  $: {
+      if (typeof document !== 'undefined') {
+        if ($theme) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+      }
+  }
 
   // Charts
   let donutChartInstance = null;
@@ -147,11 +156,11 @@
     const gastosData = sortedKeys.map(key => monthlyData[key].gastos);
 
     // Render Charts
-    setTimeout(() => {
+    requestAnimationFrame(() => {
         if (activeTab === 'dashboard' && donutCanvas && barCanvas) {
             renderCharts(gastosPorCat, chartLabels, ingresosData, gastosData);
         }
-    }, 100);
+    });
   }
 
   function renderCharts(gastosPorCat, barLabels, barIngresos, barGastos) {
@@ -205,6 +214,7 @@
   }
 
   async function handleLogin() {
+    isLoading = true;
     try {
       authError = '';
       if (isRegistering) {
@@ -220,6 +230,8 @@
       }
     } catch (e) {
       authError = e.message || 'Error de autenticación';
+    } finally {
+        isLoading = false;
     }
   }
 
@@ -229,18 +241,6 @@
     email = '';
     password = '';
     user = {};
-  }
-
-  function handleForgotPasswordSubmit() {
-    if (!resetEmail) {
-        alert('Por favor ingresa tu correo electrónico.');
-        return;
-    }
-    setTimeout(() => {
-        alert('Si el correo existe, recibirás instrucciones para recuperar tu contraseña.');
-        isForgotPassword = false;
-        resetEmail = '';
-    }, 1000);
   }
 
   function handleTabChange(tab) {
@@ -328,9 +328,9 @@
       isModalAbonoMetaOpen = true;
   }
 
-  async function handleSaveAbonoMeta(metaId, monto) {
+  async function handleSaveAbonoMeta(metaId, payload) {
       try {
-          await api.abonarMeta(metaId, monto);
+          await api.abonarMeta(metaId, payload);
           isModalAbonoMetaOpen = false;
           abonoMetaTarget = null;
           loadData();
@@ -342,6 +342,7 @@
 
 {#if !isAuthenticated}
   <div class="w-screen h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-300 relative overflow-hidden">
+    <!-- Background Image with Overlay -->
     <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1579621970563-ebec7560eb3e?q=80&w=2500&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
     
     <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md relative z-10 animate-fade-in backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
@@ -353,78 +354,49 @@
         <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">Gestiona tus finanzas con inteligencia.</p>
       </div>
 
-      {#if !isForgotPassword}
-        <div class="flex bg-gray-100 dark:bg-gray-900/50 rounded-lg p-1 mb-6">
-            <button on:click={() => isRegistering = false} class="flex-1 py-2 text-sm font-medium rounded-md transition { !isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Iniciar Sesión</button>
-            <button on:click={() => isRegistering = true} class="flex-1 py-2 text-sm font-medium rounded-md transition { isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Registrarse</button>
-        </div>
+      <div class="flex bg-gray-100 dark:bg-gray-900/50 rounded-lg p-1 mb-6">
+          <button on:click={() => isRegistering = false} class="flex-1 py-2 text-sm font-medium rounded-md transition { !isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Iniciar Sesión</button>
+          <button on:click={() => isRegistering = true} class="flex-1 py-2 text-sm font-medium rounded-md transition { isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Registrarse</button>
+      </div>
 
-        <form on:submit|preventDefault={handleLogin} class="space-y-4">
-            {#if isRegistering}
-            <div>
-                <label for="register-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre Completo</label>
-                <div class="relative">
-                    <i class="fas fa-user absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input id="register-name" type="text" bind:value={name} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Tu Nombre" required>
-                </div>
-            </div>
-            {/if}
-            <div>
-            <label for="email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
-            <div class="relative">
-                <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                <input id="email" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
-            </div>
-            </div>
-            <div>
-            <label for="password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Contraseña</label>
-            <div class="relative">
-                <i class="fas fa-lock absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                <input id="password" type="password" bind:value={password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="••••••••" required>
-            </div>
-            </div>
-            
-            {#if !isRegistering}
-            <div class="flex justify-end">
-                <button type="button" on:click={() => isForgotPassword = true} class="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors">
-                    ¿Olvidaste tu contraseña?
-                </button>
-            </div>
-            {/if}
+      <form on:submit|preventDefault={handleLogin} class="space-y-4">
+          {#if isRegistering}
+          <div>
+              <label for="register-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre Completo</label>
+              <div class="relative">
+                  <i class="fas fa-user absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
+                  <input id="register-name" type="text" bind:value={name} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Tu Nombre" required>
+              </div>
+          </div>
+          {/if}
+          <div>
+          <label for="email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
+          <div class="relative">
+              <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
+              <input id="email" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
+          </div>
+          </div>
+          <div>
+          <label for="password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Contraseña</label>
+          <div class="relative">
+              <i class="fas fa-lock absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
+              <input id="password" type="password" bind:value={password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="••••••••" required>
+          </div>
+          </div>
+          
+          {#if authError}
+              <p class="text-rose-500 text-sm text-center">{authError}</p>
+          {/if}
 
-            {#if authError}
-                <p class="text-rose-500 text-sm text-center">{authError}</p>
+          <button type="submit" disabled={isLoading} class="w-full {isRegistering ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02] disabled:opacity-50">
+            {#if isLoading}
+                <i class="fas fa-spinner fa-spin mr-2"></i> Conectando...
+            {:else}
+                {isRegistering ? 'Crear Cuenta' : 'Ingresar'}
             {/if}
+          </button>
+      </form>
 
-            <button type="submit" class="w-full {isRegistering ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-600 hover:bg-emerald-500'} text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02]">
-            {isRegistering ? 'Crear Cuenta' : 'Ingresar'}
-            </button>
-        </form>
-      {:else}
-        <!-- Forgot Password View -->
-        <div class="space-y-4">
-            <div class="text-center mb-4">
-                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
-                    <i class="fas fa-key text-xl"></i>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Recuperar Contraseña</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Ingresa tu correo para recibir instrucciones.</p>
-            </div>
-            <div>
-                <label for="reset-email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
-                <div class="relative">
-                    <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input id="reset-email" type="email" bind:value={resetEmail} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
-                </div>
-            </div>
-            <button on:click={handleForgotPasswordSubmit} class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02]">
-                Enviar Correo
-            </button>
-            <button on:click={() => isForgotPassword = false} class="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white mt-2 transition-colors">
-                Volver al Inicio de Sesión
-            </button>
-        </div>
-      {/if}
     </div>
   </div>
 {:else}
@@ -485,7 +457,7 @@
             <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                 <div class="flex-1 relative">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input type="text" placeholder="Buscar..." class="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors">
+                    <input type="text" placeholder="Buscar..." class="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" />
                 </div>
             </div>
             <TransactionTable 
@@ -579,5 +551,6 @@
     onClose={() => isModalAbonoMetaOpen = false}
     onSave={handleSaveAbonoMeta}
     meta={abonoMetaTarget}
+    cuentas={cuentas} 
   />
 {/if}

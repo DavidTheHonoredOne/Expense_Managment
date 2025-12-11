@@ -65,20 +65,26 @@ def abonar_meta(
     if abono.monto <= 0:
         raise HTTPException(status_code=400, detail="El monto a abonar debe ser mayor que cero")
 
-    # Buscar una categoría por defecto para abonos a metas. Si no existe, crearla o usar una genérica.
+    # Buscar una categoría por defecto para abonos a metas.
     categoria_abono = db.query(models.Categoria).filter(
         models.Categoria.usuario_id == current_user.usuario_id,
-        func.lower(models.Categoria.nombre_categoria) == "abono a meta"
+        func.lower(models.Categoria.nombre_categoria) == "ahorro"
     ).first()
 
     if not categoria_abono:
-        categoria_abono = models.Categoria(
-            usuario_id=current_user.usuario_id,
-            nombre_categoria="Abono a Meta",
-            tipo="Gasto"
-        )
-        db.add(categoria_abono)
-        db.flush() # Flush to get categoria_id before commit
+        categoria_abono = db.query(models.Categoria).filter(
+            models.Categoria.usuario_id == current_user.usuario_id,
+            func.lower(models.Categoria.nombre_categoria).in_(["general", "otros"])
+        ).first()
+
+    if not categoria_abono:
+        categoria_abono = db.query(models.Categoria).filter(
+            models.Categoria.usuario_id == current_user.usuario_id,
+            func.lower(models.Categoria.tipo) == "ingreso"
+        ).first()
+
+    if not categoria_abono:
+        raise HTTPException(status_code=400, detail="No se encontró una categoría adecuada para el abono a meta.")
 
     # Crear el movimiento de gasto desde la cuenta de origen
     new_movimiento = models.Movimiento(
@@ -102,6 +108,7 @@ def abonar_meta(
         meta.progreso = 0
 
     # Crear el registro en MovimientoMeta
+    db.flush() # Flush to get the ID of new_movimiento
     new_movimiento_meta = models.MovimientoMeta(
         meta_id=meta.meta_id,
         movimiento_id=new_movimiento.movimiento_id,
@@ -117,3 +124,41 @@ def abonar_meta(
     db.refresh(new_movimiento_meta)
     
     return {"message": "Abono exitoso", "nuevo_monto_meta": meta.monto_actual, "nuevo_saldo_cuenta": cuenta.saldo_actual}
+
+@router.put("/{meta_id}", response_model=schemas.Meta)
+def update_meta(
+    meta_id: int,
+    meta_update: schemas.MetaCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(security.get_current_user)
+):
+    meta = db.query(models.Meta).filter(models.Meta.meta_id == meta_id, models.Meta.usuario_id == current_user.usuario_id).first()
+    if not meta:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+
+    meta.nombre_meta = meta_update.nombre_meta
+    meta.monto_objetivo = meta_update.monto_objetivo
+    meta.fecha_fin = meta_update.fecha_fin
+    
+    db.commit()
+    db.refresh(meta)
+    return meta
+
+@router.delete("/{meta_id}")
+def delete_meta(
+    meta_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(security.get_current_user)
+):
+    meta = db.query(models.Meta).filter(models.Meta.meta_id == meta_id, models.Meta.usuario_id == current_user.usuario_id).first()
+    if not meta:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+
+    # Opcional: Revertir los movimientos asociados a la meta si es necesario.
+    # Por ahora, solo borramos la meta y los registros de movimiento_meta (si la DB tiene cascada)
+    # Si no hay cascada, borrarlos manualmente
+    db.query(models.MovimientoMeta).filter(models.MovimientoMeta.meta_id == meta_id).delete()
+    
+    db.delete(meta)
+    db.commit()
+    return {"message": "Meta eliminada"}

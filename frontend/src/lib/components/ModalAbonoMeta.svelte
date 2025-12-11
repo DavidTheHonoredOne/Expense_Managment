@@ -4,23 +4,30 @@
   export let onSave;
   /** @type {any} */
   export let meta = null;
+  export let cuentas = []; // New prop for accounts
 
   let monto = null;
+  let cuenta_id = 0; // New state for selected account
 
   $: if (!isOpen) {
     monto = null;
+    cuenta_id = 0; // Reset account selection
   }
 
   const handleSubmit = () => {
     if (!meta) {
-        alert('Error: No se ha seleccionado una meta.');
+        alert("Error: No se ha seleccionado una meta.");
         return;
     }
     if (!monto || monto <= 0) {
-        alert('Por favor ingrese un monto válido');
+        alert("Por favor ingrese un monto válido");
         return;
     }
-    onSave(meta.meta_id, parseFloat(monto));
+    if (!cuenta_id || cuenta_id === 0) {
+        alert("Por favor seleccione una cuenta de origen.");
+        return;
+    }
+    onSave(meta.meta_id, { monto: Number(monto), cuenta_id: Number(cuenta_id) });
   };
 </script>
 
@@ -48,6 +55,21 @@
             placeholder="0.00"
             required
           >
+        </div>
+
+        <div>
+            <label for="abono-cuenta" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Cuenta de Origen</label>
+            <select 
+                id="abono-cuenta"
+                bind:value={cuenta_id}
+                class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:border-emerald-500"
+                required
+            >
+                <option value={0} disabled>Seleccionar cuenta...</option>
+                {#each cuentas as c}
+                    <option value={c.cuenta_id}>{c.nombre_cuenta} ({c.saldo_actual})</option>
+                {/each}
+            </select>
         </div>
 
         <button 
