@@ -32,8 +32,7 @@ def crear_meta(
         print(f"Error al crear meta: {e}")
         raise HTTPException(status_code=500, detail=f"Error interno al crear meta: {e}")
 
-
-@router.get("/", response_model=List[schemas.Meta])
+@router.get("") # Changed from "/" to ""
 def obtener_metas(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
