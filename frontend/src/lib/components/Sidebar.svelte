@@ -30,6 +30,12 @@
       <i class="fas fa-bullseye w-6"></i> Metas
     </button>
     <button 
+      on:click={() => onTabChange('perfil')} 
+      class="w-full flex items-center px-4 py-3 rounded-lg transition {activeTab === 'perfil' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-emerald-600 dark:hover:text-emerald-400'}"
+    >
+      <i class="fas fa-user w-6"></i> Perfil
+    </button>
+    <button 
       on:click={() => onTabChange('configuracion')} 
       class="w-full flex items-center px-4 py-3 rounded-lg transition {activeTab === 'configuracion' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-emerald-600 dark:hover:text-emerald-400'}"
     >

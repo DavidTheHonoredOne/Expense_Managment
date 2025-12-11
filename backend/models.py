@@ -16,10 +16,7 @@ class Usuario(Base):
     cuentas = relationship("Cuenta", back_populates="usuario")
     categorias = relationship("Categoria", back_populates="usuario")
     movimientos = relationship("Movimiento", back_populates="usuario")
-    
-    # CORRECCIÓN: Esta línea ahora sí encontrará la clase 'MetaAhorro' de abajo
-    metas = relationship("MetaAhorro", back_populates="usuario")
-
+    metas = relationship("Meta", back_populates="usuario") # Updated: Refers to new Meta class
 
 class Cuenta(Base):
     __tablename__ = "Cuenta"
@@ -33,7 +30,6 @@ class Cuenta(Base):
     usuario = relationship("Usuario", back_populates="cuentas")
     movimientos = relationship("Movimiento", back_populates="cuenta")
 
-
 class Categoria(Base):
     __tablename__ = "Categoria"
 
@@ -46,27 +42,34 @@ class Categoria(Base):
     usuario = relationship("Usuario", back_populates="categorias")
     movimientos = relationship("Movimiento", back_populates="categoria")
 
-
-# CORRECCIÓN: Renombrada de 'Meta' a 'MetaAhorro' para evitar el error
-class MetaAhorro(Base):
-    __tablename__ = "Meta_Ahorro"
+class Meta(Base): # Renamed from MetaAhorro to Meta
+    __tablename__ = "Meta"
 
     meta_id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("Usuario.usuario_id"), nullable=False)
     nombre_meta = Column(String(100), nullable=False)
     monto_objetivo = Column(DECIMAL(15, 2), nullable=False)
-    monto_actual = Column(DECIMAL(15, 2), default=0)
-    fecha_inicio = Column(DateTime, nullable=False)
+    monto_actual = Column(DECIMAL(15, 2), default=0) # Ensure it's DECIMAL
+    fecha_inicio = Column(DateTime, server_default=func.now(), nullable=False) # Added server_default
     fecha_fin = Column(DateTime, nullable=False)
     estado = Column(Boolean, default=True)
 
     # Relaciones
     usuario = relationship("Usuario", back_populates="metas")
-    
-    # NOTA: He comentado esto temporalmente porque 'Movimiento' no tiene clave foránea a Meta todavía.
-    # Si lo descomentas ahora, te dará error 500.
-    # movimientos = relationship("Movimiento", back_populates="meta")
+    movimientos_meta = relationship("MovimientoMeta", back_populates="meta") # New relationship
 
+class MovimientoMeta(Base): # New Pivote Table
+    __tablename__ = "Movimiento_Meta"
+
+    movimiento_meta_id = Column(Integer, primary_key=True, index=True)
+    meta_id = Column(Integer, ForeignKey("Meta.meta_id"), nullable=False)
+    movimiento_id = Column(Integer, ForeignKey("Movimiento.movimiento_id"), nullable=False)
+    monto_destinado = Column(DECIMAL(15, 2), nullable=False)
+    fecha_asignacion = Column(DateTime, server_default=func.now())
+
+    # Relaciones
+    meta = relationship("Meta", back_populates="movimientos_meta")
+    movimiento = relationship("Movimiento", back_populates="movimientos_meta")
 
 class Movimiento(Base):
     __tablename__ = "Movimiento"
@@ -77,10 +80,11 @@ class Movimiento(Base):
     usuario_id = Column(Integer, ForeignKey("Usuario.usuario_id"), nullable=False)
     tipo = Column(String(20), nullable=False) # 'Ingreso' o 'Gasto'
     monto = Column(DECIMAL(15, 2), nullable=False)
-    fecha = Column(DateTime, server_default=func.now())
+    fecha = Column(DateTime, server_default=func.now()) # Use server_default
     descripcion = Column(Text)
 
     # Relaciones
     usuario = relationship("Usuario", back_populates="movimientos")
     categoria = relationship("Categoria", back_populates="movimientos")
     cuenta = relationship("Cuenta", back_populates="movimientos")
+    movimientos_meta = relationship("MovimientoMeta", back_populates="movimiento") # New relationship

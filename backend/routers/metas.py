@@ -1,19 +1,20 @@
 from typing import List
 import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database import get_db
 import schemas, models, security
 
 router = APIRouter(prefix="/metas", tags=["metas"])
 
-@router.post("/", response_model=schemas.MetaAhorro)
+@router.post("/", response_model=schemas.Meta)
 def crear_meta(
-    meta: schemas.MetaAhorroCreate, 
+    meta: schemas.MetaCreate, 
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
-    nueva_meta = models.MetaAhorro(
+    nueva_meta = models.Meta(
         usuario_id=current_user.usuario_id,
         nombre_meta=meta.nombre_meta,
         monto_objetivo=meta.monto_objetivo,
@@ -27,41 +28,87 @@ def crear_meta(
     db.refresh(nueva_meta)
     return nueva_meta
 
-@router.get("/", response_model=List[schemas.MetaAhorro])
+@router.get("/", response_model=List[schemas.Meta])
 def obtener_metas(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
-    return db.query(models.MetaAhorro).filter(models.MetaAhorro.usuario_id == current_user.usuario_id).all()
+    return db.query(models.Meta).filter(models.Meta.usuario_id == current_user.usuario_id).all()
 
-# Endpoint para abonar (Requerido en api.js: /metas/{metaId}/abonar)
 @router.post("/{meta_id}/abonar")
 def abonar_meta(
     meta_id: int, 
-    # Using a Pydantic model for body would be better but keeping it simple as per previous structure or assume user sends json
-    # Let's use Body or a simple schema
-    # The api.js sends { monto }
-    # I'll create a local pydantic model or use dict
-    payload: dict,
+    abono: schemas.MetaAbono,
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
-    monto = payload.get("monto")
-    if not monto:
-         raise HTTPException(status_code=400, detail="Monto requerido")
-         
-    meta = db.query(models.MetaAhorro).filter(models.MetaAhorro.meta_id == meta_id, models.MetaAhorro.usuario_id == current_user.usuario_id).first()
+    meta = db.query(models.Meta).filter(models.Meta.meta_id == meta_id, models.Meta.usuario_id == current_user.usuario_id).first()
     if not meta:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
     
-    meta.monto_actual += float(monto)
+    cuenta = db.query(models.Cuenta).filter(models.Cuenta.cuenta_id == abono.cuenta_id, models.Cuenta.usuario_id == current_user.usuario_id).first()
+    if not cuenta:
+        raise HTTPException(status_code=404, detail="Cuenta de origen no encontrada o no pertenece al usuario")
+
+    if cuenta.saldo_actual < abono.monto:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente en la cuenta de origen")
+
+    if abono.monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto a abonar debe ser mayor que cero")
+
+    # Buscar una categoría por defecto para abonos a metas. Si no existe, crearla o usar una genérica.
+    # Para simplificar, buscamos una categoría llamada 'Abono a Meta' o 'Transferencia'.
+    # En un sistema real, podrías tener una ID de categoría configurada para esto.
+    categoria_abono = db.query(models.Categoria).filter(
+        models.Categoria.usuario_id == current_user.usuario_id,
+        func.lower(models.Categoria.nombre_categoria) == 'abono a meta'
+    ).first()
+
+    if not categoria_abono:
+        # Si no existe, crea una. O podrías decidir usar una categoría de gasto genérica.
+        # Para este ejemplo, crearemos una si no existe.
+        categoria_abono = models.Categoria(
+            usuario_id=current_user.usuario_id,
+            nombre_categoria="Abono a Meta",
+            tipo="Gasto" # O "Transferencia" si se maneja como tal
+        )
+        db.add(categoria_abono)
+        db.flush() # Flush to get categoria_id before commit
+
+    # Crear el movimiento de gasto desde la cuenta de origen
+    new_movimiento = models.Movimiento(
+        usuario_id=current_user.usuario_id,
+        cuenta_id=abono.cuenta_id,
+        categoria_id=categoria_abono.categoria_id,
+        tipo="Gasto", # Se considera un gasto para la cuenta de origen
+        monto=abono.monto,
+        fecha=datetime.datetime.now(),
+        descripcion=f"Abono a meta: {meta.nombre_meta}"
+    )
+    db.add(new_movimiento)
     
-    # Calculate progress? It's calculated in frontend or property?
-    # Schema has progress: Optional[float].
+    # Actualizar saldos y meta
+    cuenta.saldo_actual -= abono.monto
+    meta.monto_actual += abono.monto
+    
     if meta.monto_objetivo > 0:
         meta.progreso = float(meta.monto_actual) / float(meta.monto_objetivo)
     else:
         meta.progreso = 0
-        
+
+    # Crear el registro en MovimientoMeta
+    new_movimiento_meta = models.MovimientoMeta(
+        meta_id=meta.meta_id,
+        movimiento_id=new_movimiento.movimiento_id,
+        monto_destinado=abono.monto,
+        fecha_asignacion=datetime.datetime.now()
+    )
+    db.add(new_movimiento_meta)
+
     db.commit()
-    return {"message": "Abono exitoso", "nuevo_monto": meta.monto_actual}
+    db.refresh(meta)
+    db.refresh(cuenta)
+    db.refresh(new_movimiento)
+    db.refresh(new_movimiento_meta)
+    
+    return {"message": "Abono exitoso", "nuevo_monto_meta": meta.monto_actual, "nuevo_saldo_cuenta": cuenta.saldo_actual}

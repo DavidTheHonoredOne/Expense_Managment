@@ -69,6 +69,56 @@ def create_movimiento(
     
     return new_movimiento
 
+@router.put("/{movimiento_id}", response_model=schemas.Movimiento)
+def update_movimiento(
+    movimiento_id: int,
+    movimiento: schemas.MovimientoCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(security.get_current_user)
+):
+    existing_movimiento = db.query(models.Movimiento).filter(
+        models.Movimiento.movimiento_id == movimiento_id,
+        models.Movimiento.usuario_id == current_user.usuario_id
+    ).first()
+
+    if not existing_movimiento:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    
+    # Revert old balance first
+    old_cuenta = existing_movimiento.cuenta
+    if existing_movimiento.tipo.lower() == 'ingreso':
+        old_cuenta.saldo_actual -= existing_movimiento.monto
+    else:
+        old_cuenta.saldo_actual += existing_movimiento.monto
+
+    # Update movement fields
+    for field, value in movimiento.model_dump(exclude_unset=True).items():
+        setattr(existing_movimiento, field, value)
+    
+    # Apply new balance
+    new_cuenta = db.query(models.Cuenta).filter(
+        models.Cuenta.cuenta_id == movimiento.cuenta_id, 
+        models.Cuenta.usuario_id == current_user.usuario_id
+    ).first()
+    if not new_cuenta:
+        raise HTTPException(status_code=404, detail="Nueva cuenta no encontrada o no pertenece al usuario")
+
+    if existing_movimiento.tipo.lower() == 'ingreso':
+        new_cuenta.saldo_actual += existing_movimiento.monto
+    else:
+        new_cuenta.saldo_actual -= existing_movimiento.monto
+
+    db.commit()
+    db.refresh(existing_movimiento)
+
+    # Populate optional fields for response
+    if existing_movimiento.categoria:
+        existing_movimiento.nombre_categoria = existing_movimiento.categoria.nombre_categoria
+    if existing_movimiento.cuenta:
+        existing_movimiento.nombre_cuenta = existing_movimiento.cuenta.nombre_cuenta
+
+    return existing_movimiento
+
 @router.delete("/{movimiento_id}")
 def delete_movimiento(
     movimiento_id: int,

@@ -16,16 +16,13 @@ def obtener_resumen(
     # Total Ingresos
     ingresos = db.query(func.sum(models.Movimiento.monto)).filter(
         models.Movimiento.usuario_id == current_user.usuario_id,
-        models.Movimiento.tipo == 'ingreso' # Case sensitive? models says 'Ingreso' or 'Gasto'. Let's assume lowercase or check DB. 
-        # Modal sends 'ingreso' (lowercase).
-        # We should handle case insensitivity or ensure consistency.
-        # I'll use ilike or assume frontend sends lowercase.
+        func.lower(models.Movimiento.tipo) == 'ingreso'
     ).scalar() or 0
 
     # Total Gastos
     gastos = db.query(func.sum(models.Movimiento.monto)).filter(
         models.Movimiento.usuario_id == current_user.usuario_id,
-        models.Movimiento.tipo == 'gasto'
+        func.lower(models.Movimiento.tipo) == 'gasto'
     ).scalar() or 0
 
     # Saldo Total (Sum of accounts)

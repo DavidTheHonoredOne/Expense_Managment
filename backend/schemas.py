@@ -47,7 +47,6 @@ class CategoriaBase(BaseModel):
     tipo: str  
 
 class CategoriaCreate(CategoriaBase):
-    # usuario_id removed, handled by token
     pass
 
 class Categoria(CategoriaBase):
@@ -66,43 +65,68 @@ class MovimientoBase(BaseModel):
 class MovimientoCreate(MovimientoBase):
     cuenta_id: int
     categoria_id: int
-    # usuario_id removed, handled by token
 
 class Movimiento(MovimientoBase):
     movimiento_id: int
     usuario_id: int
     cuenta_id: int
     categoria_id: int
-    # Opcionales para cuando se haga el Join
     nombre_categoria: Optional[str] = None 
     nombre_cuenta: Optional[str] = None
+    # New: Relationship to MovimientoMeta
+    movimientos_meta: List["MovimientoMeta"] = [] # New: To support relationships
 
     class Config:
         from_attributes = True
 
-# --- META AHORRO ---
-class MetaAhorroBase(BaseModel):
+# --- META ---
+class MetaBase(BaseModel):
     nombre_meta: str
     monto_objetivo: Decimal
     fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None
 
-class MetaAhorroCreate(MetaAhorroBase):
-    # usuario_id removed, handled by token
+class MetaCreate(MetaBase):
     pass
 
-class MetaAhorro(MetaAhorroBase):
+class Meta(MetaBase):
     meta_id: int
     usuario_id: int
     monto_actual: Decimal
     estado: bool
     progreso: Optional[float] = 0 
+    movimientos_meta: List["MovimientoMeta"] = [] # New: To support relationships
 
     class Config:
         from_attributes = True
+
+# --- MOVIMIENTO META (Pivote) ---
+class MovimientoMetaBase(BaseModel):
+    monto_destinado: Decimal
+    fecha_asignacion: Optional[datetime] = None
+
+class MovimientoMetaCreate(MovimientoMetaBase):
+    meta_id: int
+    movimiento_id: int
+
+class MovimientoMeta(MovimientoMetaBase):
+    movimiento_meta_id: int
+    meta_id: int
+    movimiento_id: int
+
+    class Config:
+        from_attributes = True
+
+class MetaAbono(BaseModel):
+    monto: Decimal
+    cuenta_id: int # Nuevo campo requerido para abonar
 
 # --- DASHBOARD ---
 class DashboardResumen(BaseModel):
     total_ingresos: Decimal
     total_gastos: Decimal
     saldo_total: Decimal
+
+# Update forward refs
+Movimiento.model_rebuild()
+Meta.model_rebuild()

@@ -9,7 +9,7 @@ import models, schemas, security
 from database import engine, get_db
 
 # Importamos los routers (Ahora sí existen todos)
-from routers import categoria, metas, cuentas, movimientos, dashboard
+from routers import categoria, metas, cuentas, movimientos, dashboard, usuarios
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -39,6 +39,7 @@ app.include_router(metas.router)
 app.include_router(cuentas.router)
 app.include_router(movimientos.router)
 app.include_router(dashboard.router)
+app.include_router(usuarios.router)
 
 @app.get("/")
 def health_check():

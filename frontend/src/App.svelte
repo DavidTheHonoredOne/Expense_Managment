@@ -1,6 +1,10 @@
 <script>
   import { onMount } from 'svelte';
+  import { fly } from 'svelte/transition';
   import { api } from './lib/api';
+  import { theme } from './lib/stores/theme';
+  import { formatMoney } from './lib/utils/format';
+  
   import Sidebar from './lib/components/Sidebar.svelte';
   import KpiCard from './lib/components/KpiCard.svelte';
   import TransactionTable from './lib/components/TransactionTable.svelte';
@@ -8,18 +12,25 @@
   import ModalCuenta from './lib/components/ModalCuenta.svelte';
   import ModalCategoria from './lib/components/ModalCategoria.svelte';
   import ModalMeta from './lib/components/ModalMeta.svelte';
+  import ModalAbonoMeta from './lib/components/ModalAbonoMeta.svelte';
   import Configuracion from './lib/components/Configuracion.svelte';
+  import Perfil from './lib/components/Perfil.svelte';
+  
   import Chart from 'chart.js/auto';
 
   let isAuthenticated = false;
   let activeTab = 'dashboard';
+  
+  // Modals
   let isModalOpen = false;
   let isModalCuentaOpen = false;
   let isModalCategoriaOpen = false;
   let isModalMetaOpen = false;
+  let isModalAbonoMetaOpen = false;
 
-  // Edit Mode State
+  // Edit Mode & State
   let editingTransaction = null;
+  let abonoMetaTarget = null;
 
   // Data
   let kpis = { saldo: 0, ingresos: 0, gastos: 0 };
@@ -27,6 +38,7 @@
   let cuentas = [];
   let categorias = [];
   let metas = [];
+  let user = {};
 
   // Auth Form
   let email = '';
@@ -39,9 +51,6 @@
   let isForgotPassword = false;
   let resetEmail = '';
 
-  // Dark Mode
-  let darkMode = true; // Default to dark for now, will check local storage
-
   // Charts
   let donutChartInstance = null;
   let barChartInstance = null;
@@ -49,36 +58,21 @@
   let barCanvas;
 
   onMount(async () => {
-    // Check Dark Mode
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        darkMode = savedTheme === 'dark';
-    } else {
-        darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    updateTheme();
+    theme.init(); // Initialize theme preference
 
     const token = localStorage.getItem('access_token');
     if (token) {
       isAuthenticated = true;
-      await loadData();
+      try {
+        user = await api.getProfile();
+        await loadData();
+      } catch (error) {
+        if (error.status === 401) {
+          handleLogout();
+        }
+      }
     }
   });
-
-  function updateTheme() {
-    if (darkMode) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-    }
-  }
-
-  function toggleDarkMode() {
-    darkMode = !darkMode;
-    updateTheme();
-  }
 
   async function loadData() {
     try {
@@ -119,7 +113,7 @@
     const movs = await api.getMovimientos().catch(err => []);
     
     // Process for Donut (Gastos por Categoria)
-    const gastos = movs.filter(m => m.tipo === 'gasto' || m.tipo === 'Gasto'); 
+    const gastos = movs.filter(m => m.tipo.toLowerCase() === 'gasto'); 
     const gastosPorCat = {};
     gastos.forEach(g => {
         const catName = g.nombre_categoria || categorias.find(c => c.categoria_id === g.categoria_id)?.nombre_categoria || 'Otros';
@@ -164,8 +158,9 @@
     if (donutChartInstance) donutChartInstance.destroy();
     if (barChartInstance) barChartInstance.destroy();
 
-    const textColors = darkMode ? 'white' : '#1f2937';
-    const gridColors = darkMode ? '#374151' : '#e5e7eb';
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColors = isDark ? '#e5e7eb' : '#1f2937';
+    const gridColors = isDark ? '#374151' : '#e5e7eb';
 
     // Donut
     donutChartInstance = new Chart(donutCanvas, {
@@ -220,6 +215,7 @@
         const res = await api.login(email, password);
         localStorage.setItem('access_token', res.access_token);
         isAuthenticated = true;
+        user = await api.getProfile();
         await loadData();
       }
     } catch (e) {
@@ -232,6 +228,7 @@
     isAuthenticated = false;
     email = '';
     password = '';
+    user = {};
   }
 
   function handleForgotPasswordSubmit() {
@@ -239,9 +236,8 @@
         alert('Por favor ingresa tu correo electrónico.');
         return;
     }
-    // Simulate API call
     setTimeout(() => {
-        alert('Se ha enviado un correo de recuperación a ' + resetEmail);
+        alert('Si el correo existe, recibirás instrucciones para recuperar tu contraseña.');
         isForgotPassword = false;
         resetEmail = '';
     }, 1000);
@@ -252,14 +248,11 @@
     loadData();
   }
 
-  // --- Movimientos CRUD ---
   async function handleSaveMovimiento(data) {
     try {
       if (editingTransaction) {
-        // Update logic
         await api.updateMovimiento(editingTransaction.movimiento_id, data);
       } else {
-        // Create logic
         await api.createMovimiento(data);
       }
       isModalOpen = false;
@@ -280,7 +273,6 @@
     isModalOpen = true;
   }
 
-  // --- Cuentas CRUD ---
   async function handleSaveCuenta(data) {
     try {
       await api.createCuenta(data);
@@ -301,7 +293,6 @@
     }
   }
 
-  // --- Categorias CRUD ---
   async function handleSaveCategoria(data) {
     try {
       await api.createCategoria(data);
@@ -322,7 +313,6 @@
     }
   }
 
-  // --- Metas CRUD ---
   async function handleSaveMeta(data) {
     try {
         await api.createMeta(data);
@@ -333,17 +323,30 @@
     }
   }
 
-  function formatMoney(amount) {
-    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(amount);
+  function handleOpenAbonoMeta(meta) {
+      abonoMetaTarget = meta;
+      isModalAbonoMetaOpen = true;
+  }
+
+  async function handleSaveAbonoMeta(metaId, monto) {
+      try {
+          await api.abonarMeta(metaId, monto);
+          isModalAbonoMetaOpen = false;
+          abonoMetaTarget = null;
+          loadData();
+      } catch (e) {
+          alert('Error al abonar: ' + e.message);
+      }
   }
 </script>
 
 {#if !isAuthenticated}
-  <div class="w-screen h-screen flex items-center justify-center bg-gray-100 dark:bg-[url('https://images.unsplash.com/photo-1579621970563-ebec7560eb3e?q=80&w=2500&auto=format&fit=crop')] bg-cover bg-center relative transition-colors duration-300">
-    <div class="absolute inset-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm"></div>
-    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md relative z-10 animate-fade-in">
+  <div class="w-screen h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-300 relative overflow-hidden">
+    <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1579621970563-ebec7560eb3e?q=80&w=2500&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
+    
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md relative z-10 animate-fade-in backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95">
       <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500 mb-4">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 mb-4 shadow-sm">
           <i class="fas fa-wallet text-3xl"></i>
         </div>
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Bienvenido a EMS</h1>
@@ -351,7 +354,7 @@
       </div>
 
       {#if !isForgotPassword}
-        <div class="flex bg-gray-100 dark:bg-gray-900 rounded-lg p-1 mb-6">
+        <div class="flex bg-gray-100 dark:bg-gray-900/50 rounded-lg p-1 mb-6">
             <button on:click={() => isRegistering = false} class="flex-1 py-2 text-sm font-medium rounded-md transition { !isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Iniciar Sesión</button>
             <button on:click={() => isRegistering = true} class="flex-1 py-2 text-sm font-medium rounded-md transition { isRegistering ? 'bg-white dark:bg-emerald-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white' }">Registrarse</button>
         </div>
@@ -362,7 +365,7 @@
                 <label for="register-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre Completo</label>
                 <div class="relative">
                     <i class="fas fa-user absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input id="register-name" type="text" bind:value={name} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" placeholder="Tu Nombre" required>
+                    <input id="register-name" type="text" bind:value={name} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Tu Nombre" required>
                 </div>
             </div>
             {/if}
@@ -370,20 +373,20 @@
             <label for="email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
             <div class="relative">
                 <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                <input id="email" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" placeholder="ejemplo@correo.com" required>
+                <input id="email" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
             </div>
             </div>
             <div>
             <label for="password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Contraseña</label>
             <div class="relative">
                 <i class="fas fa-lock absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                <input id="password" type="password" bind:value={password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" placeholder="••••••••" required>
+                <input id="password" type="password" bind:value={password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="••••••••" required>
             </div>
             </div>
             
             {#if !isRegistering}
             <div class="flex justify-end">
-                <button type="button" on:click={() => isForgotPassword = true} class="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300">
+                <button type="button" on:click={() => isForgotPassword = true} class="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors">
                     ¿Olvidaste tu contraseña?
                 </button>
             </div>
@@ -401,6 +404,9 @@
         <!-- Forgot Password View -->
         <div class="space-y-4">
             <div class="text-center mb-4">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
+                    <i class="fas fa-key text-xl"></i>
+                </div>
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Recuperar Contraseña</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400">Ingresa tu correo para recibir instrucciones.</p>
             </div>
@@ -408,13 +414,13 @@
                 <label for="reset-email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
                 <div class="relative">
                     <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input id="reset-email" type="email" bind:value={resetEmail} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" placeholder="ejemplo@correo.com" required>
+                    <input id="reset-email" type="email" bind:value={resetEmail} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
                 </div>
             </div>
             <button on:click={handleForgotPasswordSubmit} class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02]">
                 Enviar Correo
             </button>
-            <button on:click={() => isForgotPassword = false} class="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white mt-2">
+            <button on:click={() => isForgotPassword = false} class="w-full text-gray-500 dark:text-gray-400 text-sm hover:text-gray-900 dark:hover:text-white mt-2 transition-colors">
                 Volver al Inicio de Sesión
             </button>
         </div>
@@ -425,18 +431,19 @@
   <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
     <Sidebar 
         {activeTab} 
-        {darkMode}
+        darkMode={$theme}
         onTabChange={handleTabChange} 
         onLogout={handleLogout} 
-        toggleDarkMode={toggleDarkMode}
+        toggleDarkMode={theme.toggle}
     />
     
-    <main class="flex-1 overflow-y-auto p-8 relative">
-      <header class="flex justify-between items-center mb-8">
+    <main class="flex-1 overflow-y-auto p-8 relative scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
+      <header class="flex justify-between items-center mb-8" in:fly={{ y: -20, duration: 500 }}>
         <h2 class="text-3xl font-bold text-gray-800 dark:text-white">
             {activeTab === 'dashboard' ? 'Resumen Financiero' : 
              activeTab === 'movimientos' ? 'Historial de Movimientos' : 
-             activeTab === 'metas' ? 'Metas de Ahorro' : 'Configuración'}
+             activeTab === 'metas' ? 'Metas de Ahorro' : 
+             activeTab === 'perfil' ? 'Mi Perfil' : 'Configuración'}
         </h2>
         
         {#if activeTab === 'movimientos'}
@@ -451,7 +458,7 @@
       </header>
 
       {#if activeTab === 'dashboard'}
-        <div class="space-y-6 animate-fade-in">
+        <div class="space-y-6" in:fly={{ y: 20, duration: 500, delay: 100 }}>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <KpiCard title="Saldo Actual" value={formatMoney(kpis.saldo)} />
                 <KpiCard title="Ingresos (Total)" value={formatMoney(kpis.ingresos)} color="text-teal-500 dark:text-teal-400" />
@@ -459,13 +466,13 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                     <h4 class="font-bold mb-4 text-gray-800 dark:text-white">Top Gastos por Categoría</h4>
                     <div class="h-64 flex items-center justify-center">
                         <canvas bind:this={donutCanvas}></canvas>
                     </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                     <h4 class="font-bold mb-4 text-gray-800 dark:text-white">Balance Mensual</h4>
                     <div class="h-64">
                         <canvas bind:this={barCanvas}></canvas>
@@ -474,11 +481,11 @@
             </div>
         </div>
       {:else if activeTab === 'movimientos'}
-        <div class="space-y-6 animate-fade-in">
-            <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div class="space-y-6" in:fly={{ y: 20, duration: 500 }}>
+            <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                 <div class="flex-1 relative">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input type="text" placeholder="Buscar..." class="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none">
+                    <input type="text" placeholder="Buscar..." class="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors">
                 </div>
             </div>
             <TransactionTable 
@@ -488,7 +495,7 @@
             />
         </div>
       {:else if activeTab === 'metas'}
-        <div class="space-y-6 animate-fade-in">
+        <div class="space-y-6" in:fly={{ y: 20, duration: 500 }}>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {#each metas as meta}
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 relative overflow-hidden group hover:border-purple-500 transition shadow-sm">
@@ -496,20 +503,24 @@
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <span class="bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded text-xs font-bold uppercase">Meta</span>
-                            <h4 class="text-xl font-bold text-gray-900 dark:text-white mt-1">{meta.nombre_meta}</h4>
+                            <h4 class="text-xl font-bold text-gray-900 dark:text-white mt-1 truncate max-w-[200px]" title={meta.nombre_meta}>{meta.nombre_meta}</h4>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500 dark:text-gray-400">Objetivo</p>
-                            <p class="font-bold text-gray-900 dark:text-white">{formatMoney(meta.monto_objetivo)}</p>
+                            <p class="font-bold text-gray-900 dark:text-white truncate max-w-[100px]" title={formatMoney(meta.monto_objetivo)}>{formatMoney(meta.monto_objetivo)}</p>
                         </div>
                     </div>
                     <div class="mb-2 flex justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">Progreso ({((meta.monto_actual / meta.monto_objetivo) * 100).toFixed(0)}%)</span>
-                        <span class="text-gray-900 dark:text-white font-bold">{formatMoney(meta.monto_actual)}</span>
+                        <span class="text-gray-900 dark:text-white font-bold truncate max-w-[100px]">{formatMoney(meta.monto_actual)}</span>
                     </div>
                     <div class="w-full bg-gray-200 dark:bg-gray-700 h-3 rounded-full mb-4">
-                        <div class="bg-gradient-to-r from-purple-600 to-blue-500 h-3 rounded-full" style="width: {(meta.monto_actual / meta.monto_objetivo) * 100}%"></div>
+                        <div class="bg-gradient-to-r from-purple-600 to-blue-500 h-3 rounded-full transition-all duration-1000" style="width: {Math.min(100, (meta.monto_actual / meta.monto_objetivo) * 100)}%"></div>
                     </div>
+                    
+                    <button on:click={() => handleOpenAbonoMeta(meta)} class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-emerald-600 dark:hover:bg-emerald-600 hover:text-white text-gray-700 dark:text-gray-300 font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-plus-circle"></i> Abonar
+                    </button>
                 </div>
                 {:else}
                     <div class="col-span-2 text-center py-12 text-gray-500 dark:text-gray-400">
@@ -518,6 +529,10 @@
                     </div>
                 {/each}
             </div>
+        </div>
+      {:else if activeTab === 'perfil'}
+        <div in:fly={{ y: 20, duration: 500 }}>
+            <Perfil {user} />
         </div>
       {:else if activeTab === 'configuracion'}
         <Configuracion 
@@ -557,5 +572,12 @@
     isOpen={isModalMetaOpen}
     onClose={() => isModalMetaOpen = false}
     onSave={handleSaveMeta}
+  />
+
+  <ModalAbonoMeta
+    isOpen={isModalAbonoMetaOpen}
+    onClose={() => isModalAbonoMetaOpen = false}
+    onSave={handleSaveAbonoMeta}
+    meta={abonoMetaTarget}
   />
 {/if}

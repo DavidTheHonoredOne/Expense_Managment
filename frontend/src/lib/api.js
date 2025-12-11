@@ -86,4 +86,9 @@ export const api = {
   getMetas: () => request('/metas'),
   createMeta: (data) => request('/metas', 'POST', data),
   abonarMeta: (metaId, monto) => request(`/metas/${metaId}/abonar`, 'POST', { monto }), 
+
+  // Usuarios (Perfil)
+  getProfile: () => request('/usuarios/me'),
+  updateProfile: (data) => request('/usuarios/me', 'PUT', data),
+  changePassword: (data) => request('/usuarios/cambiar-password', 'PUT', data),
 };
