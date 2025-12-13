@@ -59,71 +59,63 @@ def abonar_meta(
     if not cuenta:
         raise HTTPException(status_code=404, detail="Cuenta de origen no encontrada o no pertenece al usuario")
 
-    if cuenta.saldo_actual < abono.monto:
-        raise HTTPException(status_code=400, detail="Saldo insuficiente en la cuenta de origen")
-
-    if abono.monto <= 0:
+    monto_abono = abs(abono.monto)
+    if monto_abono <= 0:
         raise HTTPException(status_code=400, detail="El monto a abonar debe ser mayor que cero")
 
-    # Buscar una categoría por defecto para abonos a metas.
-    categoria_abono = db.query(models.Categoria).filter(
-        models.Categoria.usuario_id == current_user.usuario_id,
-        func.lower(models.Categoria.nombre_categoria) == "ahorro"
-    ).first()
+    if cuenta.saldo_actual < monto_abono:
+        raise HTTPException(status_code=400, detail="Saldo insuficiente en la cuenta de origen")
 
-    if not categoria_abono:
-        categoria_abono = db.query(models.Categoria).filter(
+    # Logica de Categoria Espejo
+    categoria_id_usar = abono.categoria_id
+    if not categoria_id_usar:
+        nombre_categoria_espejo = f"Meta: {meta.nombre_meta}"
+        categoria_espejo = db.query(models.Categoria).filter(
             models.Categoria.usuario_id == current_user.usuario_id,
-            func.lower(models.Categoria.nombre_categoria).in_(["general", "otros"])
+            models.Categoria.nombre_categoria == nombre_categoria_espejo
         ).first()
 
-    if not categoria_abono:
-        categoria_abono = db.query(models.Categoria).filter(
-            models.Categoria.usuario_id == current_user.usuario_id,
-            func.lower(models.Categoria.tipo) == "ingreso"
-        ).first()
-
-    if not categoria_abono:
-        raise HTTPException(status_code=400, detail="No se encontró una categoría adecuada para el abono a meta.")
+        if not categoria_espejo:
+            categoria_espejo = models.Categoria(
+                nombre_categoria=nombre_categoria_espejo,
+                tipo='Gasto',
+                usuario_id=current_user.usuario_id
+            )
+            db.add(categoria_espejo)
+            db.flush()
+        
+        categoria_id_usar = categoria_espejo.categoria_id
 
     # Crear el movimiento de gasto desde la cuenta de origen
     new_movimiento = models.Movimiento(
         usuario_id=current_user.usuario_id,
         cuenta_id=abono.cuenta_id,
-        categoria_id=categoria_abono.categoria_id,
-        tipo="Gasto", # Se considera un gasto para la cuenta de origen
-        monto=abono.monto,
+        categoria_id=categoria_id_usar,
+        tipo="Gasto",
+        monto=monto_abono,
         fecha=datetime.datetime.now(),
         descripcion=f"Abono a meta: {meta.nombre_meta}"
     )
     db.add(new_movimiento)
     
     # Actualizar saldos y meta
-    cuenta.saldo_actual -= abono.monto
-    meta.monto_actual += abono.monto
+    cuenta.saldo_actual -= monto_abono
+    meta.monto_actual += monto_abono
     
-    if meta.monto_objetivo > 0:
-        meta.progreso = float(meta.monto_actual) / float(meta.monto_objetivo)
-    else:
-        meta.progreso = 0
-
     # Crear el registro en MovimientoMeta
-    db.flush() # Flush to get the ID of new_movimiento
+    db.flush()
     new_movimiento_meta = models.MovimientoMeta(
         meta_id=meta.meta_id,
         movimiento_id=new_movimiento.movimiento_id,
-        monto_destinado=abono.monto,
+        monto_destinado=monto_abono,
         fecha_asignacion=datetime.datetime.now()
     )
     db.add(new_movimiento_meta)
 
     db.commit()
     db.refresh(meta)
-    db.refresh(cuenta)
-    db.refresh(new_movimiento)
-    db.refresh(new_movimiento_meta)
     
-    return {"message": "Abono exitoso", "nuevo_monto_meta": meta.monto_actual, "nuevo_saldo_cuenta": cuenta.saldo_actual}
+    return {"message": "Abono exitoso", "meta": meta}
 
 @router.put("/{meta_id}", response_model=schemas.Meta)
 def update_meta(
@@ -154,9 +146,6 @@ def delete_meta(
     if not meta:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
 
-    # Opcional: Revertir los movimientos asociados a la meta si es necesario.
-    # Por ahora, solo borramos la meta y los registros de movimiento_meta (si la DB tiene cascada)
-    # Si no hay cascada, borrarlos manualmente
     db.query(models.MovimientoMeta).filter(models.MovimientoMeta.meta_id == meta_id).delete()
     
     db.delete(meta)

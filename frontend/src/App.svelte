@@ -14,11 +14,15 @@
   import ModalAbonoMeta from './lib/components/ModalAbonoMeta.svelte';
   import Configuracion from './lib/components/Configuracion.svelte';
   import Perfil from './lib/components/Perfil.svelte';
+  import OnboardingWizard from './lib/components/OnboardingWizard.svelte';
+  import ToastContainer from './lib/components/ToastContainer.svelte';
+  import { notifications } from './lib/stores/notifications';
   
   import Chart from 'chart.js/auto';
 
   let isAuthenticated = false;
   let activeTab = 'dashboard';
+  let showOnboarding = false;
   
   // Modals
   let isModalOpen = false;
@@ -83,14 +87,18 @@
     try {
       // Load foundational data (always needed for modals)
       const [cuentasRes, catsRes] = await Promise.all([
-        api.getCuentas().catch(err => []),
-        api.getCategorias().catch(err => [])
+        api.getCuentas().catch(err => { notifications.addNotification('Error al cargar cuentas', 'error'); return []; }),
+        api.getCategorias().catch(err => { notifications.addNotification('Error al cargar categorías', 'error'); return []; })
       ]);
       cuentas = cuentasRes;
       categorias = catsRes;
 
+      if (cuentas.length === 0) {
+        showOnboarding = true;
+      }
+
       if (activeTab === 'dashboard') {
-        const dashboard = await api.getDashboard().catch(err => ({ total_ingresos: 0, total_gastos: 0, saldo_total: 0 }));
+        const dashboard = await api.getDashboard().catch(err => { notifications.addNotification('Error al cargar dashboard', 'error'); return ({ total_ingresos: 0, total_gastos: 0, saldo_total: 0 }); });
         kpis = {
             saldo: dashboard.saldo_total,
             ingresos: dashboard.total_ingresos,
@@ -98,24 +106,25 @@
         };
         await loadChartsData();
       } else if (activeTab === 'movimientos') {
-        transactions = await api.getMovimientos().catch(err => []);
+        transactions = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar movimientos', 'error'); return []; });
         transactions = transactions.map(t => ({
             ...t,
             nombre_cuenta: t.nombre_cuenta || cuentas.find(c => c.cuenta_id === t.cuenta_id)?.nombre_cuenta,
             nombre_categoria: t.nombre_categoria || categorias.find(c => c.categoria_id === t.categoria_id)?.nombre_categoria
         }));
       } else if (activeTab === 'metas') {
-        metas = await api.getMetas().catch(err => []);
+        metas = await api.getMetas().catch(err => { notifications.addNotification('Error al cargar metas', 'error'); return []; });
       } 
       // Configuracion uses 'cuentas' and 'categorias' which are already loaded
     } catch (error) {
       console.error('Error loading data', error);
+      notifications.addNotification('Error general al cargar datos: ' + (error.message || 'Desconocido'), 'error');
       if (error.status === 401 || (error.message && error.message.includes('401'))) handleLogout();
     }
   }
 
   async function loadChartsData() {
-    const movs = await api.getMovimientos().catch(err => []);
+    const movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar datos para gráficos', 'error'); return []; });
     
     // Process for Donut (Gastos por Categoria)
     const gastos = movs.filter(m => m.tipo.toLowerCase() === 'gasto'); 
@@ -216,7 +225,7 @@
       if (isRegistering) {
         await api.register({ nombre: name, email, contraseña: password });
         isRegistering = false;
-        alert('Registro exitoso. Por favor inicia sesión.');
+        notifications.addNotification('Registro exitoso. Por favor inicia sesión.', 'success');
       } else {
         const res = await api.login(email, password);
         localStorage.setItem('access_token', res.access_token);
@@ -226,6 +235,7 @@
       }
     } catch (e) {
       authError = e.message || 'Error de autenticación';
+      notifications.addNotification('Error de autenticación: ' + authError, 'error');
     } finally {
         isLoading = false;
     }
@@ -237,6 +247,7 @@
     email = '';
     password = '';
     user = {};
+    notifications.addNotification('Sesión cerrada correctamente.', 'info');
   }
 
   function handleTabChange(tab) {
@@ -248,14 +259,16 @@
     try {
       if (editingTransaction) {
         await api.updateMovimiento(editingTransaction.movimiento_id, data);
+        notifications.addNotification('Movimiento actualizado exitosamente.', 'success');
       } else {
         await api.createMovimiento(data);
+        notifications.addNotification('Movimiento creado exitosamente.', 'success');
       }
       isModalOpen = false;
       editingTransaction = null;
       loadData();
     } catch (e) {
-      alert('Error al guardar: ' + e.message);
+      notifications.addNotification('Error al guardar movimiento: ' + (e.message || 'Desconocido'), 'error');
     }
   }
 
@@ -272,40 +285,44 @@
   async function handleSaveCuenta(data) {
     try {
       await api.createCuenta(data);
+      notifications.addNotification('Cuenta creada exitosamente.', 'success');
       isModalCuentaOpen = false;
       loadData();
     } catch (e) {
-      alert('Error al crear cuenta: ' + e.message);
+      notifications.addNotification('Error al crear cuenta: ' + (e.message || 'Desconocido'), 'error');
     }
   }
 
   async function handleDeleteCuenta(id) {
-    if(!confirm('¿Estás seguro de eliminar esta cuenta?')) return;
+    if(!confirm('¿Estás seguro de eliminar esta cuenta?')) return; // Keep native confirm for critical destructive action
     try {
       await api.deleteCuenta(id);
+      notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
       loadData();
     } catch (e) {
-      alert('Error al eliminar: ' + e.message);
+      notifications.addNotification('Error al eliminar cuenta: ' + (e.message || 'Desconocido'), 'error');
     }
   }
 
   async function handleSaveCategoria(data) {
     try {
       await api.createCategoria(data);
+      notifications.addNotification('Categoría creada exitosamente.', 'success');
       isModalCategoriaOpen = false;
       loadData();
     } catch (e) {
-      alert('Error al crear categoría: ' + e.message);
+      notifications.addNotification('Error al crear categoría: ' + (e.message || 'Desconocido'), 'error');
     }
   }
 
   async function handleDeleteCategoria(id) {
-    if(!confirm('¿Estás seguro de eliminar esta categoría?')) return;
+    if(!confirm('¿Estás seguro de eliminar esta categoría?')) return; // Keep native confirm for critical destructive action
     try {
       await api.deleteCategoria(id);
+      notifications.addNotification('Categoría eliminada exitosamente.', 'success');
       loadData();
     } catch (e) {
-      alert('Error al eliminar: ' + e.message);
+      notifications.addNotification('Error al eliminar categoría: ' + (e.message || 'Desconocido'), 'error');
     }
   }
 
@@ -313,14 +330,16 @@
     try {
         if (meta_id) {
             await api.updateMeta(meta_id, data);
+            notifications.addNotification('Meta actualizada exitosamente.', 'success');
         } else {
             await api.createMeta(data);
+            notifications.addNotification('Meta creada exitosamente.', 'success');
         }
         isModalMetaOpen = false;
         editingMeta = null;
         loadData();
     } catch (e) {
-        alert('Error al guardar meta: ' + e.message);
+        notifications.addNotification('Error al guardar meta: ' + (e.message || 'Desconocido'), 'error');
     }
   }
   
@@ -330,12 +349,13 @@
   }
 
   async function handleDeleteMeta(metaId) {
-      if (confirm('¿Estás seguro de eliminar esta meta?')) {
+      if (confirm('¿Estás seguro de eliminar esta meta?')) { // Keep native confirm for critical destructive action
           try {
               await api.deleteMeta(metaId);
+              notifications.addNotification('Meta eliminada exitosamente.', 'success');
               loadData();
           } catch (e) {
-              alert('Error al eliminar meta: ' + e.message);
+              notifications.addNotification('Error al eliminar meta: ' + (e.message || 'Desconocido'), 'error');
           }
       }
   }
@@ -348,14 +368,54 @@
   async function handleSaveAbonoMeta(metaId, payload) {
       try {
           await api.abonarMeta(metaId, payload);
+          notifications.addNotification('Abono a meta realizado exitosamente.', 'success');
           isModalAbonoMetaOpen = false;
           abonoMetaTarget = null;
           loadData();
       } catch (e) {
-          alert('Error al abonar: ' + e.message);
+          notifications.addNotification('Error al abonar a meta: ' + (e.message || 'Desconocido'), 'error');
       }
   }
+
+  async function handleCreateOnboardingAccount(event) {
+    try {
+      await api.createCuenta(event.detail);
+      notifications.addNotification('Cuenta inicial creada exitosamente.', 'success');
+      await loadData();
+    } catch (e) {
+      notifications.addNotification('Error al crear cuenta inicial: ' + (e.message || 'Desconocido'), 'error');
+    }
+  }
+
+  async function handleGenerateCategories() {
+    try {
+      await Promise.all([
+        api.createCategoria({ nombre_categoria: 'Comida', tipo: 'Gasto' }),
+        api.createCategoria({ nombre_categoria: 'Transporte', tipo: 'Gasto' }),
+        api.createCategoria({ nombre_categoria: 'Ocio', tipo: 'Gasto' })
+      ]);
+      notifications.addNotification('Categorías básicas generadas exitosamente.', 'success');
+      await loadData();
+      showOnboarding = false;
+    } catch (e) {
+      notifications.addNotification('Error al generar categorías básicas: ' + (e.message || 'Desconocido'), 'error');
+    }
+  }
+
+  function handleFinishOnboarding() {
+    showOnboarding = false;
+    loadData();
+    notifications.addNotification('Configuración inicial omitida. Puedes añadir cuentas y categorías más tarde.', 'info');
+  }
 </script>
+
+{#if showOnboarding}
+  <OnboardingWizard
+    on:createAccount={handleCreateOnboardingAccount}
+    on:generateCategories={handleGenerateCategories}
+    on:finish={handleFinishOnboarding}
+  />
+{/if}
 
 {#if !isAuthenticated}
   <div class="w-screen h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-300 relative overflow-hidden">
@@ -580,3 +640,5 @@
     cuentas={cuentas} 
   />
 {/if}
+
+<ToastContainer />

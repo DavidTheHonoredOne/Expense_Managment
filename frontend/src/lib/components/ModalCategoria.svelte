@@ -1,19 +1,20 @@
 <script>
+  import { notifications } from "../stores/notifications";
   export let isOpen = false;
   export let onClose;
   export let onSave;
 
-  let nombre_categoria = '';
-  let tipo = 'Gasto';
+  let nombre_categoria = "";
+  let tipo = "Gasto";
 
   $: if (!isOpen) {
-    nombre_categoria = '';
-    tipo = 'Gasto';
+    nombre_categoria = "";
+    tipo = "Gasto";
   }
 
   const handleSubmit = () => {
     if (!nombre_categoria) {
-        alert('Nombre requerido');
+        notifications.addNotification("Nombre requerido", "error");
         return;
     }
     onSave({ nombre_categoria, tipo });
@@ -45,15 +46,15 @@
           <div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {tipo === 'Gasto' ? 'bg-rose-500 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-                on:click={() => tipo = 'Gasto'}
+                class="py-2 rounded-md font-medium text-sm transition {tipo === "Gasto" ? "bg-rose-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                on:click={() => tipo = "Gasto"}
             >
                 Gasto
             </button>
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {tipo === 'Ingreso' ? 'bg-teal-500 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-                on:click={() => tipo = 'Ingreso'}
+                class="py-2 rounded-md font-medium text-sm transition {tipo === "Ingreso" ? "bg-teal-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                on:click={() => tipo = "Ingreso"}
             >
                 Ingreso
             </button>

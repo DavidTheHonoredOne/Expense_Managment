@@ -1,21 +1,22 @@
 <script>
+  import { notifications } from "../stores/notifications";
   export let isOpen = false;
   export let onClose;
   export let onSave;
 
-  let nombre_cuenta = '';
-  let saldo_inicial = '';
-  let tipo = 'Banco';
+  let nombre_cuenta = "";
+  let saldo_inicial = "";
+  let tipo = "Banco";
 
   $: if (!isOpen) {
-    nombre_cuenta = '';
-    saldo_inicial = '';
-    tipo = 'Banco';
+    nombre_cuenta = "";
+    saldo_inicial = "";
+    tipo = "Banco";
   }
 
   const handleSubmit = () => {
     if (!nombre_cuenta) {
-        alert('Nombre requerido');
+        notifications.addNotification("Nombre requerido", "error");
         return;
     }
     onSave({ 

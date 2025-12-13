@@ -30,41 +30,32 @@ def crear_cuenta(
     db.commit()
     db.refresh(nueva_cuenta)
 
-    if cuenta.saldo_inicial > 0:
-        # Buscar una categoría para "Saldo Inicial" o "General"
-        categoria_inicial = db.query(models.Categoria).filter(
-            models.Categoria.usuario_id == current_user.usuario_id,
-            func.lower(models.Categoria.nombre_categoria).in_(["saldo inicial", "general", "otros"])
-        ).first()
-
-        if not categoria_inicial:
-            # Si no se encuentra, busca la primera de tipo Ingreso
-            categoria_inicial = db.query(models.Categoria).filter(
-                models.Categoria.usuario_id == current_user.usuario_id,
-                func.lower(models.Categoria.tipo) == "ingreso"
-            ).first()
+    if cuenta.saldo_inicial != 0:
+        # Find or create a category for initial balance adjustments
+        categoria_ajuste = db.query(models.Categoria).filter(
+            models.Categoria.usuario_id == current_user.usuario_id
+        ).first() # Check if any category exists
         
-        if not categoria_inicial:
-            # Si aún no existe, crea una por defecto
-            categoria_inicial = models.Categoria(
+        if not categoria_ajuste:
+            categoria_ajuste = models.Categoria(
                 usuario_id=current_user.usuario_id,
-                nombre_categoria="Saldo Inicial",
+                nombre_categoria="Ajustes de Saldo",
                 tipo="Ingreso"
             )
-            db.add(categoria_inicial)
-            db.flush() # Flush to get categoria_id
+            db.add(categoria_ajuste)
+            db.flush()
 
         nuevo_movimiento = models.Movimiento(
             usuario_id=current_user.usuario_id,
             cuenta_id=nueva_cuenta.cuenta_id,
-            categoria_id=categoria_inicial.categoria_id,
+            categoria_id=categoria_ajuste.categoria_id,
             tipo="Ingreso",
-            monto=cuenta.saldo_inicial,
-            descripcion="Saldo Inicial de la cuenta",
+            monto=abs(cuenta.saldo_inicial),
+            descripcion="Saldo Inicial",
             fecha=datetime.datetime.now()
         )
         db.add(nuevo_movimiento)
-        db.commit() # Commit the movement as well
+        db.commit()
         db.refresh(nuevo_movimiento)
 
     return nueva_cuenta

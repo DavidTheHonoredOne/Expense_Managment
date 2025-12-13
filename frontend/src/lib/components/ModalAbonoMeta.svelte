@@ -1,4 +1,5 @@
 <script>
+  import { notifications } from "../stores/notifications";
   export let isOpen = false;
   export let onClose;
   export let onSave;
@@ -16,15 +17,15 @@
 
   const handleSubmit = () => {
     if (!meta) {
-        alert("Error: No se ha seleccionado una meta.");
+        notifications.addNotification("Error: No se ha seleccionado una meta.", "error");
         return;
     }
     if (!monto || monto <= 0) {
-        alert("Por favor ingrese un monto válido");
+        notifications.addNotification("Por favor ingrese un monto válido", "error");
         return;
     }
     if (!cuenta_id || cuenta_id === 0) {
-        alert("Por favor seleccione una cuenta de origen.");
+        notifications.addNotification("Por favor seleccione una cuenta de origen.", "error");
         return;
     }
     onSave(meta.meta_id, { monto: Number(monto), cuenta_id: Number(cuenta_id) });

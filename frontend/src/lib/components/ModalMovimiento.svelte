@@ -1,4 +1,5 @@
 <script>
+  import { notifications } from "../stores/notifications";
   export let isOpen = false;
   export let onClose;
   export let onSave;
@@ -8,12 +9,12 @@
   export let editingTransaction = null;
 
   let form = {
-    tipo: 'gasto',
+    tipo: "gasto",
     monto: null,
     cuenta_id: 0,
     categoria_id: 0,
-    fecha: new Date().toISOString().split('T')[0],
-    descripcion: ''
+    fecha: new Date().toISOString().split("T")[0],
+    descripcion: ""
   };
 
   $: if (isOpen) {
@@ -23,7 +24,7 @@
             monto: editingTransaction.monto,
             cuenta_id: editingTransaction.cuenta_id,
             categoria_id: editingTransaction.categoria_id,
-            fecha: editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            fecha: editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
             descripcion: editingTransaction.descripcion
         };
     } else {
@@ -34,18 +35,18 @@
   $: if (!isOpen) {
     // Reset form when closed
     form = {
-        tipo: 'gasto',
+        tipo: "gasto",
         monto: null,
         cuenta_id: 0,
         categoria_id: 0,
-        fecha: new Date().toISOString().split('T')[0],
-        descripcion: ''
+        fecha: new Date().toISOString().split("T")[0],
+        descripcion: ""
     };
   }
 
   const handleSubmit = () => {
     if (!form.cuenta_id || !form.categoria_id || !form.monto) {
-        alert('Por favor complete los campos obligatorios');
+        notifications.addNotification("Por favor complete los campos obligatorios", "error");
         return;
     }
 
@@ -68,23 +69,23 @@
       <button on:click={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white" aria-label="Cerrar">
         <i class="fas fa-times text-xl"></i>
       </button>
-      <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">{editingTransaction ? 'Editar Movimiento' : 'Registrar Movimiento'}</h3>
+      <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">{editingTransaction ? "Editar Movimiento" : "Registrar Movimiento"}</h3>
       <form on:submit|preventDefault={handleSubmit} class="space-y-4">
         <div>
           <span class="block text-sm text-gray-600 dark:text-gray-400 mb-2">Tipo de Movimiento</span>
           <div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {form.tipo === 'gasto' ? 'bg-rose-500 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-                on:click={() => form.tipo = 'gasto'}
+                class="py-2 rounded-md font-medium text-sm transition {form.tipo === "gasto" ? "bg-rose-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                on:click={() => form.tipo = "gasto"}
                 disabled={!!editingTransaction}
             >
                 Gasto
             </button>
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {form.tipo === 'ingreso' ? 'bg-teal-500 text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-                on:click={() => form.tipo = 'ingreso'}
+                class="py-2 rounded-md font-medium text-sm transition {form.tipo === "ingreso" ? "bg-teal-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                on:click={() => form.tipo = "ingreso"}
                 disabled={!!editingTransaction}
             >
                 Ingreso
@@ -119,7 +120,7 @@
                 <option value={c.cuenta_id}>{c.nombre_cuenta}</option>
               {/each}
             </select>
-            <p class="text-rose-500 text-[10px] mt-1">Obligatorio (ID)</p>
+            
           </div>
           <div>
             <label for="categoria" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Categoría <span class="text-rose-500">*</span></label>
@@ -134,7 +135,7 @@
                 <option value={cat.categoria_id}>{cat.nombre_categoria}</option>
               {/each}
             </select>
-            <p class="text-rose-500 text-[10px] mt-1">Obligatorio (ID)</p>
+            
           </div>
         </div>
 
@@ -163,7 +164,7 @@
             type="submit" 
             class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20"
         >
-            {editingTransaction ? 'Actualizar Transacción' : 'Guardar Transacción'}
+            {editingTransaction ? "Actualizar Transacción" : "Guardar Transacción"}
         </button>
       </form>
     </div>
