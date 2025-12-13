@@ -37,8 +37,8 @@
           </td>
           <td class="px-6 py-4 text-gray-900 dark:text-white hidden md:table-cell">{t.descripcion || ''}</td>
           <td class="px-6 py-4 hidden md:table-cell">{t.nombre_cuenta || ''}</td>
-          <td class="px-6 py-4 text-right font-bold {t.tipo === 'ingreso' ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}">
-            {t.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(t.monto)}
+          <td class="px-6 py-4 text-right font-bold {t.tipo && t.tipo.toLowerCase() === 'ingreso' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+            {t.tipo && t.tipo.toLowerCase() === 'ingreso' ? '+' : '-'} {formatCurrency(t.monto)}
           </td>
           <td class="px-6 py-4 text-center">
             <button on:click={() => onEdit(t)} class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-white mx-1 transition" aria-label="Editar" title="Editar"><i class="fas fa-pencil"></i></button>

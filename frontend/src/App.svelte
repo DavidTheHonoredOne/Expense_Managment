@@ -423,6 +423,8 @@
           notifications.addNotification('Abono a meta realizado exitosamente.', 'success');
           isModalAbonoMetaOpen = false;
           abonoMetaTarget = null;
+          // Invalidate Cache for all tabs
+          dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
           needsRefresh = true;
           loadData();
       } catch (e) {

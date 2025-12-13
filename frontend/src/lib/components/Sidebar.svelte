@@ -41,16 +41,24 @@
     </button>
   </nav>
   
-  <div class="p-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700">JD</div>
-        <div class="text-sm">
-          <p class="font-medium text-gray-900 dark:text-white">Usuario</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">En línea</p>
+  <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+    <div class="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-3 border border-slate-200 dark:border-slate-700 shadow-sm">
+        <!-- Avatar -->
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold shadow-sm">
+            JD
         </div>
-      </div>
-      <button on:click={onLogout} class="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-white transition" title="Cerrar Sesión"><i class="fas fa-sign-out-alt"></i></button>
+        <!-- Info -->
+        <div class="flex-1 min-w-0">
+            <p class="font-semibold text-sm text-slate-800 dark:text-white truncate">Usuario</p>
+            <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Pro</p>
+            </div>
+        </div>
+        <!-- Action -->
+        <button on:click={onLogout} class="text-slate-400 hover:text-rose-500 transition-colors p-1" title="Cerrar Sesión">
+            <i class="fas fa-sign-out-alt"></i>
+        </button>
     </div>
   </div>
 </aside>
