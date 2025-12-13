@@ -25,26 +25,47 @@
 
   function formatCurrency(value) {
     if (!value && value !== 0) return "";
-    const numericValue = value.toString().replace(/\D/g, '');
-    if (numericValue === "") return "";
+    // Convertir a número primero para manejar decimales correctamente
+    const numericValue = parseFloat(value.toString().replace(/\D/g, '')) || 0;
 
-    const formatted = new Intl.NumberFormat('es-ES').format(parseInt(numericValue) || 0);
+    // Formatear SIEMPRE con puntos de miles, incluso para valores pequeños (ej: 1000 -> 1.000)
+    const formatted = new Intl.NumberFormat('es-ES', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      useGrouping: true // Fuerza los separadores de miles
+    }).format(Math.floor(numericValue));
+
     return formatted;
+  }
+
+  function cleanNumericValue(value) {
+    // Limpia el valor para obtener solo números (para el backend)
+    return value.toString().replace(/\D/g, '');
   }
 
   $: if (isOpen) {
     if (editingTransaction) {
-        form = {
-            tipo: editingTransaction.tipo,
-            monto: editingTransaction.monto,
-            cuenta_id: editingTransaction.cuenta_id,
-            categoria_id: editingTransaction.categoria_id,
-            fecha: editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-            descripcion: editingTransaction.descripcion
-        };
+        // Asignar el valor numérico limpio (sin puntos) a form.monto
+        form.monto = parseFloat(editingTransaction.monto) || null;
+        // Formatear el valor para mostrar (con puntos)
         displayMonto = formatCurrency(editingTransaction.monto?.toString() || "");
+        // Asignar los demás campos
+        form.tipo = editingTransaction.tipo;
+        form.cuenta_id = editingTransaction.cuenta_id;
+        form.categoria_id = editingTransaction.categoria_id;
+        form.fecha = editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+        form.descripcion = editingTransaction.descripcion;
     } else {
-        // Keep current state if user is typing, or reset if it was a fresh open
+        // Resetear el formulario cuando se abre para crear nuevo
+        form = {
+            tipo: "gasto",
+            monto: null,
+            cuenta_id: 0,
+            categoria_id: 0,
+            fecha: new Date().toISOString().split("T")[0],
+            descripcion: ""
+        };
+        displayMonto = "";
     }
   }
 

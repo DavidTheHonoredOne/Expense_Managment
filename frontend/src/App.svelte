@@ -72,6 +72,20 @@
   let needsRefresh = false;
   let dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
 
+  function resetState() {
+      user = {};
+      isAuthenticated = false;
+      // Limpiar datos sensibles
+      transactions = [];
+      cuentas = [];
+      categorias = [];
+      metas = [];
+      kpis = { saldo: 0, ingresos: 0, gastos: 0 };
+      // Limpiar caché
+      dataCache = { dashboard: null, movimientos: null, cuentas: null, metas: null, perfil: null };
+      needsRefresh = true;
+  }
+
   // Charts
   let donutChartInstance = null;
   let barChartInstance = null;
@@ -293,6 +307,10 @@
         isRegistering = false;
         notifications.addNotification('Registro exitoso. Por favor inicia sesión.', 'success');
       } else {
+        // Limpieza preventiva: Asegurar que si el logout falló, el nuevo usuario empieza con pantalla en blanco
+        // Llamar a resetState() pero mantener isAuthenticated en false por ahora
+        resetState();
+
         const res = await api.login(email, password);
         localStorage.setItem('access_token', res.access_token);
         isAuthenticated = true;
@@ -308,12 +326,22 @@
   }
 
   function handleLogout() {
+    // 1. Llamar a resetState() para limpiar todos los datos sensibles
+    resetState();
+
+    // 2. Borrar el token de autenticación
     localStorage.removeItem('access_token');
-    isAuthenticated = false;
+
+    // 3. Limpiar campos de autenticación
     email = '';
     password = '';
-    user = {};
-    notifications.addNotification('Sesión cerrada correctamente.', 'info');
+
+    // 4. Fuerza una recarga dura para limpiar la memoria RAM del navegador por seguridad
+    // Esto es especialmente importante para aplicaciones financieras
+    window.location.href = '/';
+
+    // Nota: La notificación se mostrará después de la recarga en el login
+    // notifications.addNotification('Sesión cerrada correctamente.', 'info');
   }
 
   function handleTabChange(tab) {
@@ -461,7 +489,11 @@
             await api.createMeta(data);
             notifications.addNotification('Meta creada exitosamente.', 'success');
         }
-        // 1. Invalidar TODA la caché relacionada para forzar actualización
+
+        // 1. Pequeño delay de seguridad para dar tiempo a la base de datos de confirmar la transacción
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // 2. Invalidar TODA la caché relacionada para forzar actualización
         dataCache = {
             dashboard: null,
             movimientos: null,
@@ -471,8 +503,32 @@
             perfil: null
         };
 
-        // 2. Forzar recarga inmediata de la vista actual
+        // 3. Forzar recarga inmediata de la vista actual
         await loadData();
+
+        // 4. Verificar que la meta se haya agregado correctamente a la lista
+        // Si no está en la lista, recargar específicamente las metas
+        if (meta_id) {
+            // Para actualización, buscar la meta actualizada
+            const updatedMeta = metas.find(m => m.meta_id === meta_id);
+            if (!updatedMeta) {
+                // Si no se encontró, recargar metas específicamente (con delay adicional)
+                await new Promise(resolve => setTimeout(resolve, 100));
+                metas = await api.getMetas().catch(err => []);
+                dataCache.metas = metas;
+            }
+        } else {
+            // Para creación, verificar que la nueva meta esté en la lista
+            // Como no tenemos el ID de la nueva meta, confiamos en la recarga de loadData()
+            // Pero podemos verificar que la lista no esté vacía si debería tener elementos
+            if (metas.length === 0) {
+                // Delay adicional para creación de nuevas metas
+                await new Promise(resolve => setTimeout(resolve, 100));
+                metas = await api.getMetas().catch(err => []);
+                dataCache.metas = metas;
+            }
+        }
+
         isModalMetaOpen = false;
         editingMeta = null;
     } catch (e) {
@@ -696,6 +752,23 @@
                     <KpiCard title="Gastos (Total)" value={formatMoney(kpis.gastos)} color="text-rose-500 dark:text-rose-400" />
                 {/if}
             </div>
+
+            <!-- Asesor Financiero - Mensaje de ayuda para saldo negativo -->
+            {#if !isDataLoading && kpis.saldo < 0}
+              <div class="mt-6 bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r shadow-sm dark:bg-orange-900/20 dark:border-orange-400 animate-fade-in">
+                <div class="flex items-start">
+                  <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                  </div>
+                  <div class="ml-3">
+                    <h3 class="text-sm font-medium text-orange-800 dark:text-orange-300">Atención: Flujo de Caja Negativo</h3>
+                    <div class="mt-1 text-sm text-orange-700 dark:text-orange-400">
+                      <p>Tus gastos han superado tus ingresos este mes. Te recomendamos revisar tus categorías de mayor consumo y evitar gastos hormiga hasta recuperar el equilibrio.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {/if}
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">

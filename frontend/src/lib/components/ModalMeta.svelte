@@ -16,7 +16,13 @@
     const numericValue = value.toString().replace(/\D/g, '');
     if (numericValue === "") return "";
 
-    const formatted = new Intl.NumberFormat('es-ES').format(parseInt(numericValue) || 0);
+    // Formatear SIEMPRE con puntos de miles, incluso para valores pequeños (ej: 1000 -> 1.000)
+    const formatted = new Intl.NumberFormat('es-ES', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      useGrouping: true // Fuerza los separadores de miles
+    }).format(parseInt(numericValue) || 0);
+
     return formatted;
   }
 
