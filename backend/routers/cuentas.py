@@ -31,19 +31,22 @@ def crear_cuenta(
     db.refresh(nueva_cuenta)
 
     if cuenta.saldo_inicial != 0:
-        # Find or create a category for initial balance adjustments
+        # Busca una categoría de tipo "Ingreso" (ej: "Ajustes"). Si no existe, créala.
         categoria_ajuste = db.query(models.Categoria).filter(
-            models.Categoria.usuario_id == current_user.usuario_id
-        ).first() # Check if any category exists
+            models.Categoria.usuario_id == current_user.usuario_id,
+            models.Categoria.nombre_categoria == "Ajustes",
+            models.Categoria.tipo == "Ingreso"
+        ).first()
         
         if not categoria_ajuste:
             categoria_ajuste = models.Categoria(
                 usuario_id=current_user.usuario_id,
-                nombre_categoria="Ajustes de Saldo",
+                nombre_categoria="Ajustes",
                 tipo="Ingreso"
             )
             db.add(categoria_ajuste)
-            db.flush()
+            db.commit()
+            db.refresh(categoria_ajuste)
 
         nuevo_movimiento = models.Movimiento(
             usuario_id=current_user.usuario_id,

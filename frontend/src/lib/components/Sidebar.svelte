@@ -4,7 +4,7 @@
   export let onLogout;
 </script>
 
-<aside class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full transition-colors duration-300">
+<aside class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden md:flex flex-col h-full transition-colors duration-300">
   <div class="p-6">
     <h1 class="text-2xl font-bold text-emerald-600 dark:text-emerald-500"><i class="fas fa-wallet mr-2"></i>EMS App</h1>
   </div>

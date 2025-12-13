@@ -51,71 +51,81 @@ def abonar_meta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
+    # 1. Validación de Datos
     meta = db.query(models.Meta).filter(models.Meta.meta_id == meta_id, models.Meta.usuario_id == current_user.usuario_id).first()
     if not meta:
         raise HTTPException(status_code=404, detail="Meta no encontrada")
     
     cuenta = db.query(models.Cuenta).filter(models.Cuenta.cuenta_id == abono.cuenta_id, models.Cuenta.usuario_id == current_user.usuario_id).first()
     if not cuenta:
-        raise HTTPException(status_code=404, detail="Cuenta de origen no encontrada o no pertenece al usuario")
+        raise HTTPException(status_code=404, detail="Cuenta de origen no encontrada")
 
-    monto_abono = abs(abono.monto)
-    if monto_abono <= 0:
-        raise HTTPException(status_code=400, detail="El monto a abonar debe ser mayor que cero")
+    monto_real = abs(abono.monto)
+    if monto_real <= 0:
+         raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
 
-    if cuenta.saldo_actual < monto_abono:
+    if cuenta.saldo_actual < monto_real:
         raise HTTPException(status_code=400, detail="Saldo insuficiente en la cuenta de origen")
 
-    # Logica de Categoria Espejo
-    categoria_id_usar = abono.categoria_id
-    if not categoria_id_usar:
-        nombre_categoria_espejo = f"Meta: {meta.nombre_meta}"
-        categoria_espejo = db.query(models.Categoria).filter(
-            models.Categoria.usuario_id == current_user.usuario_id,
-            models.Categoria.nombre_categoria == nombre_categoria_espejo
-        ).first()
+    # 2. Gestión Automática de Categoría
+    # Busca si existe una categoría llamada: "Meta: {meta.nombre_meta}"
+    nombre_categoria = f"Meta: {meta.nombre_meta}"
+    categoria = db.query(models.Categoria).filter(
+        models.Categoria.usuario_id == current_user.usuario_id,
+        models.Categoria.nombre_categoria == nombre_categoria
+    ).first()
 
-        if not categoria_espejo:
-            categoria_espejo = models.Categoria(
-                nombre_categoria=nombre_categoria_espejo,
-                tipo='Gasto',
-                usuario_id=current_user.usuario_id
-            )
-            db.add(categoria_espejo)
-            db.flush()
+    if not categoria:
+        # Si NO existe: Créala automáticamente
+        categoria = models.Categoria(
+            usuario_id=current_user.usuario_id,
+            nombre_categoria=nombre_categoria,
+            tipo='Gasto',
+            icono='piggy-bank'
+        )
+        db.add(categoria)
+        db.commit()
+        db.refresh(categoria)
+    
+    categoria_id_usar = categoria.categoria_id
+
+    try:
+        # 3. Transacción Atómica
+        # Crea el Movimiento
+        nuevo_movimiento = models.Movimiento(
+            usuario_id=current_user.usuario_id,
+            cuenta_id=cuenta.cuenta_id,
+            categoria_id=categoria_id_usar,
+            tipo="Gasto",
+            monto=monto_real,
+            descripcion=f"Abono a meta: {meta.nombre_meta}",
+            fecha=datetime.datetime.now()
+        )
+        db.add(nuevo_movimiento)
         
-        categoria_id_usar = categoria_espejo.categoria_id
+        # Actualiza saldos
+        cuenta.saldo_actual -= monto_real
+        meta.monto_actual += monto_real
+        
+        db.flush() 
+        
+        # Crea la relación en Movimiento_Meta
+        new_movimiento_meta = models.MovimientoMeta(
+            meta_id=meta.meta_id,
+            movimiento_id=nuevo_movimiento.movimiento_id,
+            monto_destinado=monto_real,
+            fecha_asignacion=datetime.datetime.now()
+        )
+        db.add(new_movimiento_meta)
 
-    # Crear el movimiento de gasto desde la cuenta de origen
-    new_movimiento = models.Movimiento(
-        usuario_id=current_user.usuario_id,
-        cuenta_id=abono.cuenta_id,
-        categoria_id=categoria_id_usar,
-        tipo="Gasto",
-        monto=monto_abono,
-        fecha=datetime.datetime.now(),
-        descripcion=f"Abono a meta: {meta.nombre_meta}"
-    )
-    db.add(new_movimiento)
-    
-    # Actualizar saldos y meta
-    cuenta.saldo_actual -= monto_abono
-    meta.monto_actual += monto_abono
-    
-    # Crear el registro en MovimientoMeta
-    db.flush()
-    new_movimiento_meta = models.MovimientoMeta(
-        meta_id=meta.meta_id,
-        movimiento_id=new_movimiento.movimiento_id,
-        monto_destinado=monto_abono,
-        fecha_asignacion=datetime.datetime.now()
-    )
-    db.add(new_movimiento_meta)
+        db.commit()
+        db.refresh(meta)
+        
+        return {"message": "Abono exitoso", "meta": meta}
 
-    db.commit()
-    db.refresh(meta)
-    
-    return {"message": "Abono exitoso", "meta": meta}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error interno al abonar: {str(e)}")
 
 @router.put("/{meta_id}", response_model=schemas.Meta)
 def update_meta(

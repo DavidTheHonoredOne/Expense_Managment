@@ -14,14 +14,14 @@
   };
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto">
   <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
     <thead class="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 uppercase text-xs">
       <tr>
         <th class="px-6 py-3">Fecha</th>
         <th class="px-6 py-3">Categoría</th>
-        <th class="px-6 py-3">Descripción</th>
-        <th class="px-6 py-3">Cuenta</th>
+        <th class="px-6 py-3 hidden md:table-cell">Descripción</th>
+        <th class="px-6 py-3 hidden md:table-cell">Cuenta</th>
         <th class="px-6 py-3 text-right">Monto</th>
         <th class="px-6 py-3 text-center">Acciones</th>
       </tr>
@@ -35,8 +35,8 @@
                {t.nombre_categoria || 'General'}
             </span>
           </td>
-          <td class="px-6 py-4 text-gray-900 dark:text-white">{t.descripcion || ''}</td>
-          <td class="px-6 py-4">{t.nombre_cuenta || ''}</td>
+          <td class="px-6 py-4 text-gray-900 dark:text-white hidden md:table-cell">{t.descripcion || ''}</td>
+          <td class="px-6 py-4 hidden md:table-cell">{t.nombre_cuenta || ''}</td>
           <td class="px-6 py-4 text-right font-bold {t.tipo === 'ingreso' ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}">
             {t.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(t.monto)}
           </td>

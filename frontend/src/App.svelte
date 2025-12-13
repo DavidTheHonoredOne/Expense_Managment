@@ -52,6 +52,9 @@
   let name = ''; // For registration
   let isLoading = false; // For login UX
 
+  // Optimization
+  let needsRefresh = false;
+
   // Charts
   let donutChartInstance = null;
   let barChartInstance = null;
@@ -124,7 +127,13 @@
   }
 
   async function loadChartsData() {
-    const movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar datos para gráficos', 'error'); return []; });
+    // Use cached transactions if available to avoid request
+    let movs = [];
+    if (transactions.length > 0 && !needsRefresh) {
+        movs = transactions;
+    } else {
+        movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar datos para gráficos', 'error'); return []; });
+    }
     
     // Process for Donut (Gastos por Categoria)
     const gastos = movs.filter(m => m.tipo.toLowerCase() === 'gasto'); 
@@ -169,6 +178,7 @@
   }
 
   function renderCharts(gastosPorCat, barLabels, barIngresos, barGastos) {
+   setTimeout(() => {
     if (donutChartInstance) donutChartInstance.destroy();
     if (barChartInstance) barChartInstance.destroy();
 
@@ -216,6 +226,7 @@
             } 
         }
     });
+   }, 100);
   }
 
   async function handleLogin() {
@@ -252,7 +263,19 @@
 
   function handleTabChange(tab) {
     activeTab = tab;
+    
+    // Caché Inteligente
+    const hasData = (tab === 'dashboard' && kpis.saldo !== undefined) || 
+                    (tab === 'movimientos' && transactions.length > 0) || 
+                    (tab === 'metas' && metas.length > 0);
+
+    if (!needsRefresh && hasData) {
+        if (tab === 'dashboard') loadChartsData(); // Re-render charts logic
+        return;
+    }
+
     loadData();
+    needsRefresh = false;
   }
 
   async function handleSaveMovimiento(data) {
@@ -266,6 +289,7 @@
       }
       isModalOpen = false;
       editingTransaction = null;
+      needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al guardar movimiento: ' + (e.message || 'Desconocido'), 'error');
@@ -287,6 +311,7 @@
       await api.createCuenta(data);
       notifications.addNotification('Cuenta creada exitosamente.', 'success');
       isModalCuentaOpen = false;
+      needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al crear cuenta: ' + (e.message || 'Desconocido'), 'error');
@@ -298,6 +323,7 @@
     try {
       await api.deleteCuenta(id);
       notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
+      needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al eliminar cuenta: ' + (e.message || 'Desconocido'), 'error');
@@ -309,6 +335,7 @@
       await api.createCategoria(data);
       notifications.addNotification('Categoría creada exitosamente.', 'success');
       isModalCategoriaOpen = false;
+      needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al crear categoría: ' + (e.message || 'Desconocido'), 'error');
@@ -320,6 +347,7 @@
     try {
       await api.deleteCategoria(id);
       notifications.addNotification('Categoría eliminada exitosamente.', 'success');
+      needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al eliminar categoría: ' + (e.message || 'Desconocido'), 'error');
@@ -337,6 +365,7 @@
         }
         isModalMetaOpen = false;
         editingMeta = null;
+        needsRefresh = true;
         loadData();
     } catch (e) {
         notifications.addNotification('Error al guardar meta: ' + (e.message || 'Desconocido'), 'error');
@@ -353,6 +382,7 @@
           try {
               await api.deleteMeta(metaId);
               notifications.addNotification('Meta eliminada exitosamente.', 'success');
+              needsRefresh = true;
               loadData();
           } catch (e) {
               notifications.addNotification('Error al eliminar meta: ' + (e.message || 'Desconocido'), 'error');
@@ -371,6 +401,7 @@
           notifications.addNotification('Abono a meta realizado exitosamente.', 'success');
           isModalAbonoMetaOpen = false;
           abonoMetaTarget = null;
+          needsRefresh = true;
           loadData();
       } catch (e) {
           notifications.addNotification('Error al abonar a meta: ' + (e.message || 'Desconocido'), 'error');
@@ -483,8 +514,27 @@
         onTabChange={handleTabChange} 
         onLogout={handleLogout}
     />
+
+    <nav class="md:hidden fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-around p-2 z-50 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <button on:click={() => handleTabChange('dashboard')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'dashboard' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
+        <i class="fas fa-chart-pie text-xl mb-1"></i>
+        <span class="text-[10px] font-medium">Inicio</span>
+      </button>
+      <button on:click={() => handleTabChange('movimientos')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'movimientos' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
+        <i class="fas fa-list text-xl mb-1"></i>
+        <span class="text-[10px] font-medium">Movs</span>
+      </button>
+      <button on:click={() => handleTabChange('metas')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'metas' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
+        <i class="fas fa-bullseye text-xl mb-1"></i>
+        <span class="text-[10px] font-medium">Metas</span>
+      </button>
+      <button on:click={() => handleTabChange('configuracion')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'configuracion' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
+        <i class="fas fa-bars text-xl mb-1"></i>
+        <span class="text-[10px] font-medium">Más</span>
+      </button>
+    </nav>
     
-    <main class="flex-1 overflow-y-auto p-8 relative scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 relative scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
       <header class="flex justify-between items-center mb-8" in:fly={{ y: -20, duration: 500 }}>
         <h2 class="text-3xl font-bold text-gray-800 dark:text-white">
             {activeTab === 'dashboard' ? 'Resumen Financiero' : 
