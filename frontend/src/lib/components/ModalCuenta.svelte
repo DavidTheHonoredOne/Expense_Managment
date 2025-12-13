@@ -52,8 +52,11 @@
           <input 
             id="acc-balance"
             type="number" 
-            bind:value={saldo_inicial} 
+            min="0" 
             step="0.01"
+            bind:value={saldo_inicial} 
+            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); saldo_inicial = Math.abs(parseFloat(input.value)).toString(); }}
+            on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" 
             placeholder="0.00"
           >

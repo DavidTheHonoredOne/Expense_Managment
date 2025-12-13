@@ -1,6 +1,7 @@
 <script>
   import { api } from '../api';
   import { onMount } from 'svelte';
+  import { notifications } from '../stores/notifications';
 
   export let user = {};
 
@@ -9,6 +10,7 @@
   let current_password = '';
   let new_password = '';
   let confirm_password = '';
+  let showPassword = false;
   let avatarUrl = '';
 
   onMount(() => {
@@ -30,25 +32,25 @@
   async function handleUpdateProfile() {
       try {
           await api.updateProfile({ nombre, email });
-          alert('Perfil actualizado correctamente');
+          notifications.addNotification('Perfil actualizado correctamente', 'success');
       } catch (e) {
-          alert('Error al actualizar perfil: ' + e.message);
+          notifications.addNotification('Error al actualizar perfil: ' + e.message, 'error');
       }
   }
 
   async function handleChangePassword() {
       if (new_password !== confirm_password) {
-          alert('Las contraseñas nuevas no coinciden');
+          notifications.addNotification('Las contraseñas nuevas no coinciden', 'error');
           return;
       }
       try {
           await api.changePassword({ current_password, new_password });
-          alert('Contraseña actualizada correctamente');
+          notifications.addNotification('Contraseña actualizada correctamente', 'success');
           current_password = '';
           new_password = '';
           confirm_password = '';
       } catch (e) {
-          alert('Error al cambiar contraseña: ' + e.message);
+          notifications.addNotification('Error al cambiar contraseña: ' + e.message, 'error');
       }
   }
 </script>
@@ -99,11 +101,18 @@
         </div>
         <div>
             <label for="new_password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nueva Contraseña</label>
-            <input id="new_password" type="password" bind:value={new_password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
+            <div class="relative">
+                <input id="new_password" type={showPassword ? 'text' : 'password'} bind:value={new_password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-4 pr-10 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
+                <button type="button" on:click={() => showPassword = !showPassword} class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none">
+                    <i class="fas {showPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                </button>
+            </div>
         </div>
         <div>
             <label for="confirm_password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Confirmar Nueva Contraseña</label>
-            <input id="confirm_password" type="password" bind:value={confirm_password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
+            <div class="relative">
+                <input id="confirm_password" type={showPassword ? 'text' : 'password'} bind:value={confirm_password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-4 pr-10 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
+            </div>
         </div>
         <div class="pt-2">
             <button type="submit" class="bg-gray-700 hover:bg-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium shadow-md transition-all hover:scale-[1.02]">

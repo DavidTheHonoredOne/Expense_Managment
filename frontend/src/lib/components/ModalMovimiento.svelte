@@ -102,8 +102,11 @@
           <input 
             id="monto"
             type="number" 
-            bind:value={form.monto} 
+            min="0" 
             step="0.01"
+            bind:value={form.monto} 
+            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); form.monto = Math.abs(parseFloat(input.value)); }}
+            on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold" 
             placeholder="0.00"
             required

@@ -15,6 +15,7 @@
   import Configuracion from './lib/components/Configuracion.svelte';
   import Perfil from './lib/components/Perfil.svelte';
   import OnboardingWizard from './lib/components/OnboardingWizard.svelte';
+  import ModalConfirm from './lib/components/ModalConfirm.svelte';
   import ToastContainer from './lib/components/ToastContainer.svelte';
   import { notifications } from './lib/stores/notifications';
   
@@ -35,6 +36,20 @@
   let editingTransaction = null;
   let abonoMetaTarget = null;
   let editingMeta = null;
+  
+  let confirmState = { isOpen: false, title: '', message: '', onConfirm: () => {} };
+
+  function openConfirm(title, message, action) {
+      confirmState = { 
+          isOpen: true, 
+          title, 
+          message, 
+          onConfirm: async () => { 
+              await action(); 
+              confirmState.isOpen = false; 
+          } 
+      };
+  }
 
   // Data
   let kpis = { saldo: 0, ingresos: 0, gastos: 0 };
@@ -321,17 +336,18 @@
   }
 
   async function handleDeleteMovimiento(id) {
-      if(!confirm('¿Estás seguro de eliminar este movimiento?')) return;
-      try {
-          await api.deleteMovimiento(id);
-          notifications.addNotification('Movimiento eliminado.', 'success');
-          // Invalidate Cache
-          dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-          needsRefresh = true;
-          loadData();
-      } catch (e) {
-          notifications.addNotification('Error al eliminar movimiento: ' + (e.message || 'Desconocido'), 'error');
-      }
+      openConfirm('Eliminar Movimiento', '¿Estás seguro de eliminar este movimiento?', async () => {
+          try {
+              await api.deleteMovimiento(id);
+              notifications.addNotification('Movimiento eliminado.', 'success');
+              // Invalidate Cache
+              dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
+              needsRefresh = true;
+              loadData();
+          } catch (e) {
+              notifications.addNotification('Error al eliminar movimiento: ' + (e.message || 'Desconocido'), 'error');
+          }
+      });
   }
 
   function handleEditMovimiento(transaction) {
@@ -359,17 +375,18 @@
   }
 
   async function handleDeleteCuenta(id) {
-    if(!confirm('¿Estás seguro de eliminar esta cuenta?')) return; // Keep native confirm for critical destructive action
-    try {
-      await api.deleteCuenta(id);
-      notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
-      // Invalidate Cache
-      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-      needsRefresh = true;
-      loadData();
-    } catch (e) {
-      notifications.addNotification('Error al eliminar cuenta: ' + (e.message || 'Desconocido'), 'error');
-    }
+    openConfirm('Eliminar Cuenta', '¿Estás seguro de eliminar esta cuenta? Se perderán todos los movimientos asociados.', async () => {
+        try {
+            await api.deleteCuenta(id);
+            notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
+            // Invalidate Cache
+            dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
+            needsRefresh = true;
+            loadData();
+        } catch (e) {
+            notifications.addNotification('Error al eliminar cuenta: ' + (e.message || 'Desconocido'), 'error');
+        }
+    });
   }
 
   async function handleSaveCategoria(data) {
@@ -385,15 +402,16 @@
   }
 
   async function handleDeleteCategoria(id) {
-    if(!confirm('¿Estás seguro de eliminar esta categoría?')) return; // Keep native confirm for critical destructive action
-    try {
-      await api.deleteCategoria(id);
-      notifications.addNotification('Categoría eliminada exitosamente.', 'success');
-      needsRefresh = true;
-      loadData();
-    } catch (e) {
-      notifications.addNotification('Error al eliminar categoría: ' + (e.message || 'Desconocido'), 'error');
-    }
+    openConfirm('Eliminar Categoría', '¿Estás seguro de eliminar esta categoría?', async () => {
+        try {
+            await api.deleteCategoria(id);
+            notifications.addNotification('Categoría eliminada exitosamente.', 'success');
+            needsRefresh = true;
+            loadData();
+        } catch (e) {
+            notifications.addNotification('Error al eliminar categoría: ' + (e.message || 'Desconocido'), 'error');
+        }
+    });
   }
 
   async function handleSaveMeta(data, meta_id) {
@@ -420,7 +438,7 @@
   }
 
   async function handleDeleteMeta(metaId) {
-      if (confirm('¿Estás seguro de eliminar esta meta?')) { // Keep native confirm for critical destructive action
+      openConfirm('Eliminar Meta', '¿Estás seguro de eliminar esta meta? El historial se conservará pero la meta desaparecerá.', async () => {
           try {
               await api.deleteMeta(metaId);
               notifications.addNotification('Meta eliminada exitosamente.', 'success');
@@ -429,7 +447,7 @@
           } catch (e) {
               notifications.addNotification('Error al eliminar meta: ' + (e.message || 'Desconocido'), 'error');
           }
-      }
+      });
   }
 
   function handleOpenAbonoMeta(meta) {
@@ -733,6 +751,14 @@
     onSave={handleSaveAbonoMeta}
     meta={abonoMetaTarget}
     cuentas={cuentas} 
+  />
+
+  <ModalConfirm 
+    isOpen={confirmState.isOpen}
+    title={confirmState.title}
+    message={confirmState.message}
+    onConfirm={confirmState.onConfirm}
+    onCancel={() => confirmState.isOpen = false}
   />
 {/if}
 

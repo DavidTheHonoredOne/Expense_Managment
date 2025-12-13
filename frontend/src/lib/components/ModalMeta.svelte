@@ -63,8 +63,11 @@
           <input 
             id="monto_objetivo"
             type="number" 
-            bind:value={monto_objetivo} 
+            min="0" 
             step="0.01"
+            bind:value={monto_objetivo} 
+            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); monto_objetivo = Math.abs(parseFloat(input.value)).toString(); }}
+            on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none text-lg font-bold" 
             placeholder="0.00"
             required
