@@ -8,16 +8,28 @@
 
   let nombre_meta = "";
   let monto_objetivo = "";
+  let displayMontoObjetivo = "";
   let fecha_fin = new Date().toISOString().split("T")[0];
+
+  function formatCurrency(value) {
+    if (!value && value !== 0) return "";
+    const numericValue = value.toString().replace(/\D/g, '');
+    if (numericValue === "") return "";
+
+    const formatted = new Intl.NumberFormat('es-ES').format(parseInt(numericValue) || 0);
+    return formatted;
+  }
 
   $: if (isOpen) {
     if (editingMeta) {
         nombre_meta = editingMeta.nombre_meta;
         monto_objetivo = editingMeta.monto_objetivo;
+        displayMontoObjetivo = formatCurrency(editingMeta.monto_objetivo?.toString() || "");
         fecha_fin = new Date(editingMeta.fecha_fin).toISOString().split("T")[0];
     } else {
         nombre_meta = "";
         monto_objetivo = "";
+        displayMontoObjetivo = "";
         fecha_fin = new Date().toISOString().split("T")[0];
     }
   }
@@ -60,15 +72,18 @@
         
         <div>
           <label for="monto_objetivo" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Monto Objetivo ($)</label>
-          <input 
+          <input
             id="monto_objetivo"
-            type="number" 
-            min="0" 
-            step="0.01"
-            bind:value={monto_objetivo} 
-            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); monto_objetivo = Math.abs(parseFloat(input.value)).toString(); }}
+            type="text"
+            bind:value={displayMontoObjetivo}
+            on:input={(e) => {
+              const input = /** @type {HTMLInputElement} */ (e.target);
+              const rawValue = input.value.replace(/\D/g, '');
+              monto_objetivo = rawValue ? rawValue : "";
+              displayMontoObjetivo = formatCurrency(rawValue);
+            }}
             on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
-            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none text-lg font-bold" 
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none text-lg font-bold"
             placeholder="0.00"
             required
           >

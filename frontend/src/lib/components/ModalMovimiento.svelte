@@ -21,6 +21,17 @@
     descripcion: ""
   };
 
+  let displayMonto = "";
+
+  function formatCurrency(value) {
+    if (!value && value !== 0) return "";
+    const numericValue = value.toString().replace(/\D/g, '');
+    if (numericValue === "") return "";
+
+    const formatted = new Intl.NumberFormat('es-ES').format(parseInt(numericValue) || 0);
+    return formatted;
+  }
+
   $: if (isOpen) {
     if (editingTransaction) {
         form = {
@@ -31,6 +42,7 @@
             fecha: editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
             descripcion: editingTransaction.descripcion
         };
+        displayMonto = formatCurrency(editingTransaction.monto?.toString() || "");
     } else {
         // Keep current state if user is typing, or reset if it was a fresh open
     }
@@ -99,15 +111,18 @@
         
         <div>
           <label for="monto" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Monto ($)</label>
-          <input 
+          <input
             id="monto"
-            type="number" 
-            min="0" 
-            step="0.01"
-            bind:value={form.monto} 
-            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); form.monto = Math.abs(parseFloat(input.value)); }}
+            type="text"
+            bind:value={displayMonto}
+            on:input={(e) => {
+              const input = /** @type {HTMLInputElement} */ (e.target);
+              const rawValue = input.value.replace(/\D/g, '');
+              form.monto = rawValue ? parseFloat(rawValue) : null;
+              displayMonto = formatCurrency(rawValue);
+            }}
             on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
-            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold" 
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold"
             placeholder="0.00"
             required
           >

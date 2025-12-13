@@ -120,5 +120,13 @@
             </button>
         </div>
     </form>
+
+    <!-- Botón de Cerrar Sesión -->
+    <div class="mt-8">
+        <button on:click={() => { localStorage.removeItem('access_token'); window.location.reload(); }} class="w-full mt-8 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+            <i class="fas fa-sign-out-alt"></i>
+            Cerrar Sesión
+        </button>
+    </div>
   </div>
 </div>

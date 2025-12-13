@@ -12,9 +12,40 @@
   const formatCurrency = (amount) => {
       return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(amount);
   };
+
+  const downloadCSV = () => {
+    let csv = "Fecha,Categoría,Descripción,Cuenta,Monto,Tipo\n";
+
+    transactions.forEach(t => {
+      const fecha = formatDate(t.fecha);
+      const categoria = t.nombre_categoria || 'General';
+      const descripcion = t.descripcion || '';
+      const cuenta = t.nombre_cuenta || '';
+      const monto = t.monto;
+      const tipo = t.tipo || 'gasto';
+
+      csv += `"${fecha}","${categoria}","${descripcion}","${cuenta}",${monto},"${tipo}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'movimientos.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 </script>
 
 <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto">
+  <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Movimientos</h3>
+    <button on:click={downloadCSV} class="text-gray-500 border border-gray-300 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700 px-3 py-1 rounded-md text-sm transition-colors">
+      <i class="fas fa-download mr-1"></i> Exportar CSV
+    </button>
+  </div>
   <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
     <thead class="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 uppercase text-xs">
       <tr>
