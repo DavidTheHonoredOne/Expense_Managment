@@ -31,6 +31,7 @@
   // Edit Mode & State
   let editingTransaction = null;
   let abonoMetaTarget = null;
+  let editingMeta = null;
 
   // Data
   let kpis = { saldo: 0, ingresos: 0, gastos: 0 };
@@ -313,14 +314,35 @@
     }
   }
 
-  async function handleSaveMeta(data) {
+  async function handleSaveMeta(data, meta_id) {
     try {
-        await api.createMeta(data);
+        if (meta_id) {
+            await api.updateMeta(meta_id, data);
+        } else {
+            await api.createMeta(data);
+        }
         isModalMetaOpen = false;
+        editingMeta = null;
         loadData();
     } catch (e) {
-        alert('Error al crear meta: ' + e.message);
+        alert('Error al guardar meta: ' + e.message);
     }
+  }
+  
+  function handleEditMeta(meta) {
+      editingMeta = meta;
+      isModalMetaOpen = true;
+  }
+
+  async function handleDeleteMeta(metaId) {
+      if (confirm('¿Estás seguro de eliminar esta meta?')) {
+          try {
+              await api.deleteMeta(metaId);
+              loadData();
+          } catch (e) {
+              alert('Error al eliminar meta: ' + e.message);
+          }
+      }
   }
 
   function handleOpenAbonoMeta(meta) {
@@ -423,7 +445,7 @@
             <i class="fas fa-plus"></i> Nuevo Movimiento
         </button>
         {:else if activeTab === 'metas'}
-        <button on:click={() => isModalMetaOpen = true} class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium shadow-lg shadow-purple-500/30 flex items-center gap-2 transition hover:scale-105">
+        <button on:click={() => { editingMeta = null; isModalMetaOpen = true; }} class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium shadow-lg shadow-purple-500/30 flex items-center gap-2 transition hover:scale-105">
             <i class="fas fa-plus"></i> Nueva Meta
         </button>
         {/if}
@@ -490,9 +512,19 @@
                         <div class="bg-gradient-to-r from-purple-600 to-blue-500 h-3 rounded-full transition-all duration-1000" style="width: {Math.min(100, (meta.monto_actual / meta.monto_objetivo) * 100)}%"></div>
                     </div>
                     
-                    <button on:click={() => handleOpenAbonoMeta(meta)} class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-emerald-600 dark:hover:bg-emerald-600 hover:text-white text-gray-700 dark:text-gray-300 font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
-                        <i class="fas fa-plus-circle"></i> Abonar
-                    </button>
+                    <div class="flex gap-2 mt-4">
+                        <button on:click={() => handleOpenAbonoMeta(meta)} class="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-600 dark:hover:bg-emerald-600 hover:text-white text-gray-700 dark:text-gray-300 font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+                            <i class="fas fa-plus-circle"></i> Abonar
+                        </button>
+
+                        <button on:click={() => handleEditMeta(meta)} class="w-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg transition-colors flex items-center justify-center" title="Editar Meta">
+                            <i class="fas fa-pen"></i>
+                        </button>
+
+                        <button on:click={() => handleDeleteMeta(meta.meta_id)} class="w-10 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg transition-colors flex items-center justify-center" title="Eliminar Meta">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
                 {:else}
                     <div class="col-span-2 text-center py-12 text-gray-500 dark:text-gray-400">
@@ -542,8 +574,9 @@
   
   <ModalMeta
     isOpen={isModalMetaOpen}
-    onClose={() => isModalMetaOpen = false}
+    onClose={() => { isModalMetaOpen = false; editingMeta = null; }}
     onSave={handleSaveMeta}
+    editingMeta={editingMeta}
   />
 
   <ModalAbonoMeta

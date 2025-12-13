@@ -2,19 +2,27 @@
   export let isOpen = false;
   export let onClose;
   export let onSave;
+  /** @type {any} */
+  export let editingMeta = null;
 
   let nombre_meta = '';
   let monto_objetivo = '';
-  let fecha_limite = new Date().toISOString().split('T')[0];
+  let fecha_fin = new Date().toISOString().split('T')[0];
 
-  $: if (!isOpen) {
-    nombre_meta = '';
-    monto_objetivo = '';
-    fecha_limite = new Date().toISOString().split('T')[0];
+  $: if (isOpen) {
+    if (editingMeta) {
+        nombre_meta = editingMeta.nombre_meta;
+        monto_objetivo = editingMeta.monto_objetivo;
+        fecha_fin = new Date(editingMeta.fecha_fin).toISOString().split('T')[0];
+    } else {
+        nombre_meta = '';
+        monto_objetivo = '';
+        fecha_fin = new Date().toISOString().split('T')[0];
+    }
   }
 
   const handleSubmit = () => {
-    if (!nombre_meta || !monto_objetivo || !fecha_limite) {
+    if (!nombre_meta || !monto_objetivo || !fecha_fin) {
         alert('Por favor complete los campos obligatorios');
         return;
     }
@@ -22,10 +30,10 @@
     const payload = {
         nombre_meta,
         monto_objetivo: parseFloat(monto_objetivo),
-        fecha_limite
+        fecha_fin
     };
     
-    onSave(payload);
+    onSave(payload, editingMeta ? editingMeta.meta_id : null);
   };
 </script>
 
@@ -35,7 +43,7 @@
       <button on:click={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white" aria-label="Cerrar">
         <i class="fas fa-times text-xl"></i>
       </button>
-      <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">Nueva Meta de Ahorro</h3>
+      <h3 class="text-xl font-bold mb-6 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">{editingMeta ? 'Editar Meta' : 'Nueva Meta de Ahorro'}</h3>
       <form on:submit|preventDefault={handleSubmit} class="space-y-4">
         <div>
           <label for="nombre_meta" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre de la Meta</label>
@@ -63,11 +71,11 @@
         </div>
 
         <div>
-          <label for="fecha_limite" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Fecha Límite</label>
+          <label for="fecha_fin" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Fecha Límite</label>
           <input 
-            id="fecha_limite"
+            id="fecha_fin"
             type="date" 
-            bind:value={fecha_limite} 
+            bind:value={fecha_fin} 
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-blue-500 text-sm"
             required
           >
@@ -77,7 +85,7 @@
             type="submit" 
             class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]"
         >
-            Crear Meta
+            {editingMeta ? 'Guardar Cambios' : 'Crear Meta'}
         </button>
       </form>
     </div>

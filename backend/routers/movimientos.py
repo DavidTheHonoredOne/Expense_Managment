@@ -15,7 +15,6 @@ def get_movimientos(
         models.Movimiento.usuario_id == current_user.usuario_id
     ).order_by(models.Movimiento.fecha.desc()).all()
     
-    # Populate optional fields
     for m in movimientos:
         if m.categoria:
             m.nombre_categoria = m.categoria.nombre_categoria
@@ -30,7 +29,6 @@ def create_movimiento(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
-    # Verify account ownership
     cuenta = db.query(models.Cuenta).filter(
         models.Cuenta.cuenta_id == movimiento.cuenta_id, 
         models.Cuenta.usuario_id == current_user.usuario_id
@@ -38,7 +36,6 @@ def create_movimiento(
     if not cuenta:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada o no pertenece al usuario")
     
-    # Verify category ownership
     categoria = db.query(models.Categoria).filter(
         models.Categoria.categoria_id == movimiento.categoria_id, 
         models.Categoria.usuario_id == current_user.usuario_id
@@ -46,8 +43,6 @@ def create_movimiento(
     if not categoria:
         raise HTTPException(status_code=404, detail="Categoría no encontrada o no pertenece al usuario")
     
-    # Create movement
-    # We ignore usuario_id from the body if passed, and use current_user
     mov_data = movimiento.model_dump(exclude={"usuario_id"})
     new_movimiento = models.Movimiento(
         **mov_data,
@@ -55,7 +50,6 @@ def create_movimiento(
     )
     db.add(new_movimiento)
     
-    # Update balance
     if new_movimiento.tipo.lower() == 'ingreso':
         cuenta.saldo_actual += new_movimiento.monto
     else:
@@ -83,19 +77,23 @@ def update_movimiento(
 
     if not existing_movimiento:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-    
-    # Revert old balance first
-    old_cuenta = existing_movimiento.cuenta
-    if existing_movimiento.tipo.lower() == 'ingreso':
-        old_cuenta.saldo_actual -= existing_movimiento.monto
-    else:
-        old_cuenta.saldo_actual += existing_movimiento.monto
 
-    # Update movement fields
+    link_meta = db.query(models.MovimientoMeta).filter(models.MovimientoMeta.movimiento_id == movimiento_id).first()
+
+    if link_meta and movimiento.tipo != existing_movimiento.tipo:
+        raise HTTPException(status_code=400, detail="No se puede cambiar el tipo de un abono a meta")
+
+    old_monto = existing_movimiento.monto
+    old_cuenta = existing_movimiento.cuenta
+
+    if existing_movimiento.tipo.lower() == 'ingreso':
+        old_cuenta.saldo_actual -= old_monto
+    else:
+        old_cuenta.saldo_actual += old_monto
+
     for field, value in movimiento.model_dump(exclude_unset=True).items():
         setattr(existing_movimiento, field, value)
     
-    # Apply new balance
     new_cuenta = db.query(models.Cuenta).filter(
         models.Cuenta.cuenta_id == movimiento.cuenta_id, 
         models.Cuenta.usuario_id == current_user.usuario_id
@@ -107,11 +105,16 @@ def update_movimiento(
         new_cuenta.saldo_actual += existing_movimiento.monto
     else:
         new_cuenta.saldo_actual -= existing_movimiento.monto
+    
+    if link_meta:
+        meta = db.query(models.Meta).filter(models.Meta.meta_id == link_meta.meta_id).first()
+        if meta:
+            diferencia = existing_movimiento.monto - old_monto
+            meta.monto_actual += diferencia
 
     db.commit()
     db.refresh(existing_movimiento)
 
-    # Populate optional fields for response
     if existing_movimiento.categoria:
         existing_movimiento.nombre_categoria = existing_movimiento.categoria.nombre_categoria
     if existing_movimiento.cuenta:
@@ -120,26 +123,27 @@ def update_movimiento(
     return existing_movimiento
 
 @router.delete("/{movimiento_id}")
-def delete_movimiento(
-    movimiento_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(security.get_current_user)
-):
-    mov = db.query(models.Movimiento).filter(
-        models.Movimiento.movimiento_id == movimiento_id, 
-        models.Movimiento.usuario_id == current_user.usuario_id
-    ).first()
-    
-    if not mov:
+def delete_movimiento(movimiento_id: int, db: Session = Depends(get_db), current_user: models.Usuario = Depends(security.get_current_user)):
+    movimiento = db.query(models.Movimiento).filter(models.Movimiento.movimiento_id == movimiento_id, models.Movimiento.usuario_id == current_user.usuario_id).first()
+    if not movimiento:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-    
-    # Revert balance
-    cuenta = mov.cuenta
-    if mov.tipo.lower() == 'ingreso':
-        cuenta.saldo_actual -= mov.monto
+
+    link_meta = db.query(models.MovimientoMeta).filter(models.MovimientoMeta.movimiento_id == movimiento_id).first()
+
+    if link_meta:
+        meta = db.query(models.Meta).filter(models.Meta.meta_id == link_meta.meta_id).first()
+        if meta:
+            meta.monto_actual -= movimiento.monto
+            if meta.monto_actual < 0:
+                meta.monto_actual = 0
+        db.delete(link_meta)
+
+    cuenta = movimiento.cuenta
+    if movimiento.tipo.lower() == 'ingreso':
+        cuenta.saldo_actual -= movimiento.monto
     else:
-        cuenta.saldo_actual += mov.monto
-        
-    db.delete(mov)
+        cuenta.saldo_actual += movimiento.monto
+
+    db.delete(movimiento)
     db.commit()
-    return {"message": "Movimiento eliminado"}
+    return {"message": "Movimiento eliminado exitosamente"}
