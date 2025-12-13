@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { fly } from 'svelte/transition';
   import { api } from './lib/api';
-  import { theme } from './lib/stores/theme';
   import { formatMoney } from './lib/utils/format';
   
   import Sidebar from './lib/components/Sidebar.svelte';
@@ -48,18 +47,6 @@
   let authError = '';
   let name = ''; // For registration
   let isLoading = false; // For login UX
-  
-  $: darkMode = $theme;
-
-  $: {
-      if (typeof document !== 'undefined') {
-        if ($theme) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-      }
-  }
 
   // Charts
   let donutChartInstance = null;
@@ -67,21 +54,29 @@
   let donutCanvas;
   let barCanvas;
 
-  onMount(async () => {
-    theme.init(); // Initialize theme preference
-
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      isAuthenticated = true;
-      try {
-        user = await api.getProfile();
-        await loadData();
-      } catch (error) {
-        if (error.status === 401) {
-          handleLogout();
+  onMount(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        isAuthenticated = true;
+        try {
+          user = await api.getProfile();
+          await loadData();
+        } catch (error) {
+          if (error.status === 401) {
+            handleLogout();
+          }
         }
       }
-    }
+    };
+    checkAuth();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+        if (activeTab === 'dashboard') loadChartsData(); // Recargar gráficos con nuevos colores
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   });
 
   async function loadData() {
@@ -168,7 +163,7 @@
     if (donutChartInstance) donutChartInstance.destroy();
     if (barChartInstance) barChartInstance.destroy();
 
-    const isDark = document.documentElement.classList.contains('dark');
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const textColors = isDark ? '#e5e7eb' : '#1f2937';
     const gridColors = isDark ? '#374151' : '#e5e7eb';
 
@@ -387,7 +382,7 @@
               <label for="register-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nombre Completo</label>
               <div class="relative">
                   <i class="fas fa-user absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                  <input id="register-name" type="text" bind:value={name} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Tu Nombre" required>
+                  <input id="register-name" type="text" bind:value={name} class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="Tu Nombre" required>
               </div>
           </div>
           {/if}
@@ -395,14 +390,14 @@
           <label for="email" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Correo Electrónico</label>
           <div class="relative">
               <i class="fas fa-envelope absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-              <input id="email" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
+              <input id="email" type="email" bind:value={email} class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="ejemplo@correo.com" required>
           </div>
           </div>
           <div>
           <label for="password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Contraseña</label>
           <div class="relative">
               <i class="fas fa-lock absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-              <input id="password" type="password" bind:value={password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="••••••••" required>
+              <input id="password" type="password" bind:value={password} class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" placeholder="••••••••" required>
           </div>
           </div>
           
@@ -425,10 +420,8 @@
   <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
     <Sidebar 
         {activeTab} 
-        darkMode={$theme}
         onTabChange={handleTabChange} 
-        onLogout={handleLogout} 
-        toggleDarkMode={theme.toggle}
+        onLogout={handleLogout}
     />
     
     <main class="flex-1 overflow-y-auto p-8 relative scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
@@ -479,7 +472,7 @@
             <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                 <div class="flex-1 relative">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input type="text" placeholder="Buscar..." class="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" />
+                    <input type="text" placeholder="Buscar..." class="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" />
                 </div>
             </div>
             <TransactionTable 
