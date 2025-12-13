@@ -8,6 +8,10 @@
   /** @type {any} */
   export let editingTransaction = null;
 
+  $: isMetaTransaction = editingTransaction && 
+       (editingTransaction.descripcion?.toLowerCase().includes('abono a meta') || 
+        editingTransaction.nombre_categoria?.toLowerCase().includes('meta'));
+
   let form = {
     tipo: "gasto",
     monto: null,
@@ -78,7 +82,7 @@
                 type="button" 
                 class="py-2 rounded-md font-medium text-sm transition {form.tipo === "gasto" ? "bg-rose-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
                 on:click={() => form.tipo = "gasto"}
-                disabled={!!editingTransaction}
+                disabled={isMetaTransaction}
             >
                 Gasto
             </button>
@@ -86,7 +90,7 @@
                 type="button" 
                 class="py-2 rounded-md font-medium text-sm transition {form.tipo === "ingreso" ? "bg-teal-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
                 on:click={() => form.tipo = "ingreso"}
-                disabled={!!editingTransaction}
+                disabled={isMetaTransaction}
             >
                 Ingreso
             </button>

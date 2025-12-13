@@ -311,11 +311,27 @@
       }
       isModalOpen = false;
       editingTransaction = null;
+      // Invalidate Cache
+      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
       needsRefresh = true;
       loadData();
     } catch (e) {
       notifications.addNotification('Error al guardar movimiento: ' + (e.message || 'Desconocido'), 'error');
     }
+  }
+
+  async function handleDeleteMovimiento(id) {
+      if(!confirm('¿Estás seguro de eliminar este movimiento?')) return;
+      try {
+          await api.deleteMovimiento(id);
+          notifications.addNotification('Movimiento eliminado.', 'success');
+          // Invalidate Cache
+          dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
+          needsRefresh = true;
+          loadData();
+      } catch (e) {
+          notifications.addNotification('Error al eliminar movimiento: ' + (e.message || 'Desconocido'), 'error');
+      }
   }
 
   function handleEditMovimiento(transaction) {
@@ -333,6 +349,8 @@
       await api.createCuenta(data);
       notifications.addNotification('Cuenta creada exitosamente.', 'success');
       isModalCuentaOpen = false;
+      // Invalidate Cache
+      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
       needsRefresh = true;
       loadData();
     } catch (e) {
@@ -345,6 +363,8 @@
     try {
       await api.deleteCuenta(id);
       notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
+      // Invalidate Cache
+      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
       needsRefresh = true;
       loadData();
     } catch (e) {
@@ -535,6 +555,7 @@
   <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
     <Sidebar 
         {activeTab} 
+        {user}
         onTabChange={handleTabChange} 
         onLogout={handleLogout}
     />
@@ -612,7 +633,7 @@
             <TransactionTable 
                 transactions={transactions} 
                 onEdit={handleEditMovimiento} 
-                onDelete={(id) => api.deleteMovimiento(id).then(loadData)} 
+                onDelete={handleDeleteMovimiento} 
             />
         </div>
       {:else if activeTab === 'metas'}

@@ -19,6 +19,11 @@
       notifications.addNotification('Por favor, ingresa un nombre y un saldo inicial mayor a cero.', 'error');
     }
   }
+
+  function handleGenerateCategories() {
+    dispatch('generateCategories');
+    step = 4;
+  }
 </script>
 
 <div class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[60] flex items-center justify-center p-4" transition:fade>
@@ -26,7 +31,7 @@
     
     <!-- Progress Bar -->
     <div class="absolute top-0 left-0 h-2 bg-gray-200 dark:bg-gray-700 w-full">
-        <div class="h-full bg-emerald-500 transition-all duration-500 ease-out" style="width: {(step / 3) * 100}%"></div>
+        <div class="h-full bg-emerald-500 transition-all duration-500 ease-out" style="width: {(step / 4) * 100}%"></div>
     </div>
 
     {#if step === 1}
@@ -71,6 +76,26 @@
       </div>
 
     {:else if step === 3}
+      <div in:fly={{ x: 100, duration: 300 }} class="text-center py-6">
+        <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="fas fa-tags text-2xl"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Categorías Rápidas</h2>
+        <p class="text-gray-600 dark:text-gray-300 mb-8">
+          ¿Quieres que creemos las categorías más comunes por ti? (Comida, Transporte, Ocio)
+        </p>
+        
+        <div class="space-y-3">
+            <button on:click={handleGenerateCategories} class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-500 hover:scale-[1.02] transition-all">
+              Sí, generar automáticamente
+            </button>
+            <button on:click={() => step = 4} class="w-full py-3.5 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-900 dark:hover:text-white transition-colors">
+              No, las crearé manualmente
+            </button>
+        </div>
+      </div>
+
+    {:else if step === 4}
       <div in:fly={{ x: 100, duration: 300 }} class="text-center py-6">
         <div class="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <i class="fas fa-check text-4xl"></i>
