@@ -11,6 +11,7 @@
   let displayMontoObjetivo = "";
   let fecha_fin = new Date().toISOString().split("T")[0];
 
+  // FIX(UX): Implement input masking for COP currency (Sprint 4)
   function formatCurrency(value) {
     if (!value && value !== 0) return "";
     const numericValue = value.toString().replace(/\D/g, '');
@@ -78,6 +79,7 @@
         
         <div>
           <label for="monto_objetivo" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Monto Objetivo ($)</label>
+          <!-- NOTE: Separating visual value from raw value to prevent formatting bugs -->
           <input
             id="monto_objetivo"
             type="text"

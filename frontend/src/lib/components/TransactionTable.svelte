@@ -53,9 +53,11 @@
       <i class="fas fa-download mr-1"></i> Exportar CSV
     </button>
   </div>
-  <div class="overflow-y-auto max-h-[600px] border border-slate-200 dark:border-slate-700 rounded-lg">
+  <!-- UI: Limit table height to ~6 rows with internal scroll -->
+  <!-- FIX: Sticky header added to maintain context while scrolling -->
+  <div class="overflow-y-auto max-h-[400px] border border-gray-200 rounded-lg">
     <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-    <thead class="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 uppercase text-xs">
+    <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 uppercase text-xs">
       <tr>
         <th class="px-6 py-3">Fecha</th>
         <th class="px-6 py-3">Categoría</th>
