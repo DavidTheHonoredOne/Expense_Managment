@@ -66,6 +66,7 @@
   let authError = '';
   let name = ''; // For registration
   let isLoading = false; // For login UX
+  let isDataLoading = false; // For data loading UX
 
   // Optimization
   let needsRefresh = false;
@@ -104,6 +105,8 @@
 
   async function loadData() {
     try {
+      isDataLoading = true;
+
       // 1. Foundational Data (Always needed)
       // Consider caching this too if strictly needed, but for now keep as is for reliability
       const [cuentasRes, catsRes] = await Promise.all([
@@ -121,7 +124,7 @@
       if (!needsRefresh && dataCache[activeTab]) {
           console.log(`Using cache for ${activeTab}`);
           const cached = dataCache[activeTab];
-          
+
           if (activeTab === 'dashboard') {
               kpis = cached;
               await loadChartsData(true); // true = use cache for charts
@@ -130,6 +133,7 @@
           } else if (activeTab === 'metas') {
               metas = cached;
           }
+          isDataLoading = false;
           return;
       }
 
@@ -154,14 +158,16 @@
       } else if (activeTab === 'metas') {
         metas = await api.getMetas().catch(err => { notifications.addNotification('Error al cargar metas', 'error'); return []; });
         dataCache.metas = metas;
-      } 
-      
+      }
+
       needsRefresh = false;
+      isDataLoading = false;
 
     } catch (error) {
       console.error('Error loading data', error);
       notifications.addNotification('Error general al cargar datos: ' + (error.message || 'Desconocido'), 'error');
       if (error.status === 401 || (error.message && error.message.includes('401'))) handleLogout();
+      isDataLoading = false;
     }
   }
 
@@ -324,12 +330,20 @@
         await api.createMovimiento(data);
         notifications.addNotification('Movimiento creado exitosamente.', 'success');
       }
+      // 1. Invalidar TODA la caché relacionada para forzar actualización
+      dataCache = {
+          dashboard: null,
+          movimientos: null,
+          cuentas: null,
+          metas: null,
+          categorias: null,
+          perfil: null
+      };
+
+      // 2. Forzar recarga inmediata de la vista actual
+      await loadData();
       isModalOpen = false;
       editingTransaction = null;
-      // Invalidate Cache
-      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-      needsRefresh = true;
-      loadData();
     } catch (e) {
       notifications.addNotification('Error al guardar movimiento: ' + (e.message || 'Desconocido'), 'error');
     }
@@ -340,10 +354,18 @@
           try {
               await api.deleteMovimiento(id);
               notifications.addNotification('Movimiento eliminado.', 'success');
-              // Invalidate Cache
-              dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-              needsRefresh = true;
-              loadData();
+              // 1. Invalidar TODA la caché relacionada para forzar actualización
+              dataCache = {
+                  dashboard: null,
+                  movimientos: null,
+                  cuentas: null,
+                  metas: null,
+                  categorias: null,
+                  perfil: null
+              };
+
+              // 2. Forzar recarga inmediata de la vista actual
+              await loadData();
           } catch (e) {
               notifications.addNotification('Error al eliminar movimiento: ' + (e.message || 'Desconocido'), 'error');
           }
@@ -364,11 +386,19 @@
     try {
       await api.createCuenta(data);
       notifications.addNotification('Cuenta creada exitosamente.', 'success');
+      // 1. Invalidar TODA la caché relacionada para forzar actualización
+      dataCache = {
+          dashboard: null,
+          movimientos: null,
+          cuentas: null,
+          metas: null,
+          categorias: null,
+          perfil: null
+      };
+
+      // 2. Forzar recarga inmediata de la vista actual
+      await loadData();
       isModalCuentaOpen = false;
-      // Invalidate Cache
-      dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-      needsRefresh = true;
-      loadData();
     } catch (e) {
       notifications.addNotification('Error al crear cuenta: ' + (e.message || 'Desconocido'), 'error');
     }
@@ -379,10 +409,18 @@
         try {
             await api.deleteCuenta(id);
             notifications.addNotification('Cuenta eliminada exitosamente.', 'success');
-            // Invalidate Cache
-            dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-            needsRefresh = true;
-            loadData();
+            // 1. Invalidar TODA la caché relacionada para forzar actualización
+            dataCache = {
+                dashboard: null,
+                movimientos: null,
+                cuentas: null,
+                metas: null,
+                categorias: null,
+                perfil: null
+            };
+
+            // 2. Forzar recarga inmediata de la vista actual
+            await loadData();
         } catch (e) {
             notifications.addNotification('Error al eliminar cuenta: ' + (e.message || 'Desconocido'), 'error');
         }
@@ -423,10 +461,20 @@
             await api.createMeta(data);
             notifications.addNotification('Meta creada exitosamente.', 'success');
         }
+        // 1. Invalidar TODA la caché relacionada para forzar actualización
+        dataCache = {
+            dashboard: null,
+            movimientos: null,
+            cuentas: null,
+            metas: null,
+            categorias: null,
+            perfil: null
+        };
+
+        // 2. Forzar recarga inmediata de la vista actual
+        await loadData();
         isModalMetaOpen = false;
         editingMeta = null;
-        needsRefresh = true;
-        loadData();
     } catch (e) {
         notifications.addNotification('Error al guardar meta: ' + (e.message || 'Desconocido'), 'error');
     }
@@ -442,8 +490,18 @@
           try {
               await api.deleteMeta(metaId);
               notifications.addNotification('Meta eliminada exitosamente.', 'success');
-              needsRefresh = true;
-              loadData();
+              // 1. Invalidar TODA la caché relacionada para forzar actualización
+              dataCache = {
+                  dashboard: null,
+                  movimientos: null,
+                  cuentas: null,
+                  metas: null,
+                  categorias: null,
+                  perfil: null
+              };
+
+              // 2. Forzar recarga inmediata de la vista actual
+              await loadData();
           } catch (e) {
               notifications.addNotification('Error al eliminar meta: ' + (e.message || 'Desconocido'), 'error');
           }
@@ -459,12 +517,20 @@
       try {
           await api.abonarMeta(metaId, payload);
           notifications.addNotification('Abono a meta realizado exitosamente.', 'success');
+          // 1. Invalidar TODA la caché relacionada para forzar actualización
+          dataCache = {
+              dashboard: null,
+              movimientos: null,
+              cuentas: null,
+              metas: null,
+              categorias: null,
+              perfil: null
+          };
+
+          // 2. Forzar recarga inmediata de la vista actual
+          await loadData();
           isModalAbonoMetaOpen = false;
           abonoMetaTarget = null;
-          // Invalidate Cache for all tabs
-          dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
-          needsRefresh = true;
-          loadData();
       } catch (e) {
           notifications.addNotification('Error al abonar a meta: ' + (e.message || 'Desconocido'), 'error');
       }
@@ -620,9 +686,15 @@
       {#if activeTab === 'dashboard'}
         <div class="space-y-6" in:fly={{ y: 20, duration: 500, delay: 100 }}>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <KpiCard title="Saldo Actual" value={formatMoney(kpis.saldo)} />
-                <KpiCard title="Ingresos (Total)" value={formatMoney(kpis.ingresos)} color="text-teal-500 dark:text-teal-400" />
-                <KpiCard title="Gastos (Total)" value={formatMoney(kpis.gastos)} color="text-rose-500 dark:text-rose-400" />
+                {#if isDataLoading && !kpis.saldo}
+                    <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded-xl"></div>
+                    <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded-xl"></div>
+                    <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded-xl"></div>
+                {:else}
+                    <KpiCard title="Saldo Actual" value={formatMoney(kpis.saldo)} />
+                    <KpiCard title="Ingresos (Total)" value={formatMoney(kpis.ingresos)} color="text-teal-500 dark:text-teal-400" />
+                    <KpiCard title="Gastos (Total)" value={formatMoney(kpis.gastos)} color="text-rose-500 dark:text-rose-400" />
+                {/if}
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

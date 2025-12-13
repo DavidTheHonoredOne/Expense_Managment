@@ -103,7 +103,7 @@
             <label for="new_password" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Nueva Contraseña</label>
             <div class="relative">
                 <input id="new_password" type={showPassword ? 'text' : 'password'} bind:value={new_password} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg pl-4 pr-10 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
-                <button type="button" on:click={() => showPassword = !showPassword} class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none">
+                <button type="button" on:click={() => showPassword = !showPassword} class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none" aria-label="Mostrar contraseña">
                     <i class="fas {showPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>
                 </button>
             </div>
