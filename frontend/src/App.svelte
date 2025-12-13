@@ -483,6 +483,20 @@
     });
   }
 
+  async function handleProfileUpdate() {
+      // Limpieza específica de caché del perfil para forzar actualización
+      dataCache.perfil = null;
+      needsRefresh = true;
+
+      // Recargar perfil del usuario para mostrar cambios inmediatamente
+      try {
+          user = await api.getProfile();
+          notifications.addNotification('Perfil actualizado correctamente', 'success');
+      } catch (e) {
+          notifications.addNotification('Error al recargar perfil: ' + e.message, 'error');
+      }
+  }
+
   async function handleSaveMeta(data, meta_id) {
     try {
         if (meta_id) {
@@ -620,18 +634,43 @@
     }
   }
 
-  function handleFinishOnboarding() {
-    showOnboarding = false;
-    loadData();
-    notifications.addNotification('Configuración inicial omitida. Puedes añadir cuentas y categorías más tarde.', 'info');
-  }
+  const handleOnboardingComplete = async () => {
+      // 1. Cerrar el modal visualmente primero
+      showOnboarding = false;
+
+      // 2. Mostrar indicador de carga (Skeleton)
+      isLoading = true;
+
+      // 3. LIMPIEZA TOTAL DE CACHÉ (Vital)
+      // Esto obliga a loadData() a ignorar lo que tiene en memoria y pedir datos nuevos
+      dataCache = {
+          dashboard: null,
+          movimientos: null,
+          cuentas: null,
+          metas: null,
+          categorias: null,
+          perfil: null
+      };
+      needsRefresh = true;
+
+      // 4. Pequeño delay de seguridad (500ms)
+      // Da tiempo a que el Backend termine de escribir la transacción inicial en la DB
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 5. Carga forzada
+      await loadData();
+
+      // 6. Notificar al usuario
+      isLoading = false;
+      notifications.addNotification("¡Todo listo! Bienvenido a tu Dashboard.", "success");
+  };
 </script>
 
 {#if showOnboarding}
   <OnboardingWizard
     on:createAccount={handleCreateOnboardingAccount}
     on:generateCategories={handleGenerateCategories}
-    on:finish={handleFinishOnboarding}
+    on:complete={handleOnboardingComplete}
   />
 {/if}
 
@@ -851,7 +890,7 @@
         </div>
       {:else if activeTab === 'perfil'}
         <div in:fly={{ y: 20, duration: 500 }}>
-            <Perfil {user} />
+            <Perfil {user} on:profileUpdated={handleProfileUpdate} />
         </div>
       {:else if activeTab === 'configuracion'}
         <Configuracion 

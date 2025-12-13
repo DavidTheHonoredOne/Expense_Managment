@@ -104,7 +104,7 @@
         <p class="text-gray-600 dark:text-gray-300 mb-8">
           Tu cuenta ha sido creada. Ya puedes empezar a registrar tus gastos e ingresos.
         </p>
-        <button on:click={() => dispatch("finish")} class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-500 transition-all">
+        <button on:click={() => dispatch("complete")} class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-500 transition-all">
           Ir al Dashboard
         </button>
       </div>

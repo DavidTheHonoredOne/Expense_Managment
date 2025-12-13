@@ -2,8 +2,11 @@
   import { api } from '../api';
   import { onMount } from 'svelte';
   import { notifications } from '../stores/notifications';
+  import { createEventDispatcher } from 'svelte';
 
   export let user = {};
+
+  const dispatch = createEventDispatcher();
 
   let nombre = '';
   let email = '';
@@ -12,6 +15,7 @@
   let confirm_password = '';
   let showPassword = false;
   let avatarUrl = '';
+  let isLoading = false;
 
   onMount(() => {
     if (user) {
@@ -30,11 +34,19 @@
   }
 
   async function handleUpdateProfile() {
+      isLoading = true;
       try {
+          // Actualizar el perfil vía API
           await api.updateProfile({ nombre, email });
+
+          // Emitir evento para forzar actualización completa en App.svelte
+          dispatch('profileUpdated');
+
           notifications.addNotification('Perfil actualizado correctamente', 'success');
       } catch (e) {
           notifications.addNotification('Error al actualizar perfil: ' + e.message, 'error');
+      } finally {
+          isLoading = false;
       }
   }
 
