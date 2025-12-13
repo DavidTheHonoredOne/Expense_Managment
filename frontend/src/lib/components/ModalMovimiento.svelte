@@ -8,55 +8,75 @@
   /** @type {any} */
   export let editingTransaction = null;
 
-  $: isMetaTransaction = editingTransaction && 
-       (editingTransaction.descripcion?.toLowerCase().includes('abono a meta') || 
+  $: isMetaTransaction = editingTransaction &&
+       (editingTransaction.descripcion?.toLowerCase().includes('abono a meta') ||
         editingTransaction.nombre_categoria?.toLowerCase().includes('meta'));
 
   let form = {
     tipo: "gasto",
-    monto: 0, // Monto ya no se usa aquí, pero mantener para compatibilidad
     cuenta_id: 0,
     categoria_id: 0,
     fecha: new Date().toISOString().split("T")[0],
     descripcion: ""
   };
 
-  let montoVisual = ""; // Para mostrar al usuario (con formato)
-  let montoReal = 0;    // Para enviar a la API (número entero)
+  let montoVisual = ""; // Lo que se ve (ej: "10.000")
+  let montoReal = 0;    // Lo que se envía a la API (ej: 10000)
 
-  function handleInputMonto(e) {
-      // 1. Eliminar todo lo que no sea número
-      let rawValue = e.target.value.replace(/\D/g, '');
-      // 2. Guardar valor real (entero)
-      montoReal = rawValue ? parseInt(rawValue) : 0;
-      // 3. Formatear visualmente para el usuario
-      montoVisual = rawValue ? new Intl.NumberFormat('es-CO').format(montoReal) : "";
+  // Detectar cambio de apertura
+  let wasOpen = false;
+  $: if (isOpen && !wasOpen) {
+      wasOpen = true;
+      initializeForm(); // <--- SOLO SE LLAMA UNA VEZ AL ABRIR
+  } else if (!isOpen && wasOpen) {
+      wasOpen = false;
+      resetForm();
   }
 
-  $: if (isOpen && editingTransaction) {
-      // Carga inicial: Formatea el número crudo de la DB una sola vez
-      montoReal = editingTransaction.monto;
-      montoVisual = new Intl.NumberFormat('es-CO').format(montoReal);
+  function initializeForm() {
+      if (editingTransaction) {
+          // Cargar datos existentes
+          form.tipo = editingTransaction.tipo;
+          montoReal = editingTransaction.monto;
+          montoVisual = new Intl.NumberFormat('es-CO').format(montoReal);
+          form.cuenta_id = editingTransaction.cuenta_id;
+          form.categoria_id = editingTransaction.categoria_id;
+          form.fecha = editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+          form.descripcion = editingTransaction.descripcion;
+      } else {
+          resetForm();
+      }
+  }
 
-      // Asignar los demás campos
-      form.tipo = editingTransaction.tipo;
-      form.monto = montoReal;
-      form.cuenta_id = editingTransaction.cuenta_id;
-      form.categoria_id = editingTransaction.categoria_id;
-      form.fecha = editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
-      form.descripcion = editingTransaction.descripcion;
-  } else if (isOpen && !editingTransaction) {
-      // Nuevo movimiento
-      montoVisual = "";
+  function resetForm() {
+      form.tipo = 'Gasto';
       montoReal = 0;
-      form.monto = 0;
-
-      // Asignar los demás campos por defecto
-      form.tipo = "gasto";
+      montoVisual = "";
       form.cuenta_id = 0;
       form.categoria_id = 0;
       form.fecha = new Date().toISOString().split("T")[0];
       form.descripcion = "";
+  }
+
+  function handleInputMonto(event) {
+      // 1. Obtener valor crudo y quitar todo lo que no sea número
+      const rawValue = event.target.value.replace(/\D/g, '');
+
+      // 2. Si está vacío, limpiar
+      if (rawValue === '') {
+          montoReal = 0;
+          montoVisual = "";
+          return;
+      }
+
+      // 3. Actualizar valor lógico
+      montoReal = parseInt(rawValue, 10);
+
+      // 4. Formatear y forzar actualización visual
+      montoVisual = new Intl.NumberFormat('es-CO').format(montoReal);
+
+      // 5. Hack visual para Svelte: forzar el valor en el input por si el render no lo pilla
+      event.target.value = montoVisual;
   }
 
   const handleSubmit = () => {
@@ -113,11 +133,11 @@
           <input
             id="monto"
             type="text"
-            bind:value={montoVisual}
+            placeholder="0"
+            value={montoVisual}
             on:input={handleInputMonto}
             on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold"
-            placeholder="0.00"
             required
           >
         </div>
