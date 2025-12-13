@@ -80,8 +80,7 @@ def abonar_meta(
         categoria = models.Categoria(
             usuario_id=current_user.usuario_id,
             nombre_categoria=nombre_categoria,
-            tipo='Gasto',
-            icono='piggy-bank'
+            tipo='Gasto'
         )
         db.add(categoria)
         db.commit()

@@ -54,6 +54,7 @@
 
   // Optimization
   let needsRefresh = false;
+  let dataCache = { dashboard: null, movimientos: null, metas: null, perfil: null };
 
   // Charts
   let donutChartInstance = null;
@@ -88,7 +89,8 @@
 
   async function loadData() {
     try {
-      // Load foundational data (always needed for modals)
+      // 1. Foundational Data (Always needed)
+      // Consider caching this too if strictly needed, but for now keep as is for reliability
       const [cuentasRes, catsRes] = await Promise.all([
         api.getCuentas().catch(err => { notifications.addNotification('Error al cargar cuentas', 'error'); return []; }),
         api.getCategorias().catch(err => { notifications.addNotification('Error al cargar categorías', 'error'); return []; })
@@ -100,6 +102,23 @@
         showOnboarding = true;
       }
 
+      // 2. Tab Data Caching Logic
+      if (!needsRefresh && dataCache[activeTab]) {
+          console.log(`Using cache for ${activeTab}`);
+          const cached = dataCache[activeTab];
+          
+          if (activeTab === 'dashboard') {
+              kpis = cached;
+              await loadChartsData(true); // true = use cache for charts
+          } else if (activeTab === 'movimientos') {
+              transactions = cached;
+          } else if (activeTab === 'metas') {
+              metas = cached;
+          }
+          return;
+      }
+
+      // 3. Fetch Data
       if (activeTab === 'dashboard') {
         const dashboard = await api.getDashboard().catch(err => { notifications.addNotification('Error al cargar dashboard', 'error'); return ({ total_ingresos: 0, total_gastos: 0, saldo_total: 0 }); });
         kpis = {
@@ -107,18 +126,23 @@
             ingresos: dashboard.total_ingresos,
             gastos: dashboard.total_gastos
         };
-        await loadChartsData();
+        dataCache.dashboard = kpis;
+        await loadChartsData(false); // Fetch charts
       } else if (activeTab === 'movimientos') {
-        transactions = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar movimientos', 'error'); return []; });
-        transactions = transactions.map(t => ({
+        let movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar movimientos', 'error'); return []; });
+        transactions = movs.map(t => ({
             ...t,
             nombre_cuenta: t.nombre_cuenta || cuentas.find(c => c.cuenta_id === t.cuenta_id)?.nombre_cuenta,
             nombre_categoria: t.nombre_categoria || categorias.find(c => c.categoria_id === t.categoria_id)?.nombre_categoria
         }));
+        dataCache.movimientos = transactions;
       } else if (activeTab === 'metas') {
         metas = await api.getMetas().catch(err => { notifications.addNotification('Error al cargar metas', 'error'); return []; });
+        dataCache.metas = metas;
       } 
-      // Configuracion uses 'cuentas' and 'categorias' which are already loaded
+      
+      needsRefresh = false;
+
     } catch (error) {
       console.error('Error loading data', error);
       notifications.addNotification('Error general al cargar datos: ' + (error.message || 'Desconocido'), 'error');
@@ -126,13 +150,23 @@
     }
   }
 
-  async function loadChartsData() {
-    // Use cached transactions if available to avoid request
+  async function loadChartsData(useCache = false) {
     let movs = [];
-    if (transactions.length > 0 && !needsRefresh) {
+    // If we have cached movements in dataCache, use them
+    if (useCache && dataCache.movimientos) {
+        movs = dataCache.movimientos;
+    } else if (useCache && transactions.length > 0) {
         movs = transactions;
     } else {
-        movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar datos para gráficos', 'error'); return []; });
+        // Fallback or force fetch
+        // Note: Ideally we store chart data in dataCache.dashboard too, but for now we reuse movements cache if possible
+        if (dataCache.movimientos && !needsRefresh) {
+             movs = dataCache.movimientos;
+        } else {
+             movs = await api.getMovimientos().catch(err => { notifications.addNotification('Error al cargar datos para gráficos', 'error'); return []; });
+             // Cache it for next time
+             dataCache.movimientos = movs.map(t => ({...t, nombre_cuenta: t.nombre_cuenta || cuentas.find(c => c.cuenta_id === t.cuenta_id)?.nombre_cuenta, nombre_categoria: t.nombre_categoria || categorias.find(c => c.categoria_id === t.categoria_id)?.nombre_categoria}));
+        }
     }
     
     // Process for Donut (Gastos por Categoria)
@@ -226,7 +260,7 @@
             } 
         }
     });
-   }, 100);
+   }, 200);
   }
 
   async function handleLogin() {
@@ -263,19 +297,7 @@
 
   function handleTabChange(tab) {
     activeTab = tab;
-    
-    // Caché Inteligente
-    const hasData = (tab === 'dashboard' && kpis.saldo !== undefined) || 
-                    (tab === 'movimientos' && transactions.length > 0) || 
-                    (tab === 'metas' && metas.length > 0);
-
-    if (!needsRefresh && hasData) {
-        if (tab === 'dashboard') loadChartsData(); // Re-render charts logic
-        return;
-    }
-
     loadData();
-    needsRefresh = false;
   }
 
   async function handleSaveMovimiento(data) {
@@ -528,9 +550,9 @@
         <i class="fas fa-bullseye text-xl mb-1"></i>
         <span class="text-[10px] font-medium">Metas</span>
       </button>
-      <button on:click={() => handleTabChange('configuracion')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'configuracion' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
-        <i class="fas fa-bars text-xl mb-1"></i>
-        <span class="text-[10px] font-medium">Más</span>
+      <button on:click={() => handleTabChange('perfil')} class="flex flex-col items-center justify-center w-full p-2 {activeTab === 'perfil' ? 'text-emerald-600 dark:text-emerald-500' : 'text-gray-500 dark:text-gray-400'}">
+        <i class="fas fa-user text-xl mb-1"></i>
+        <span class="text-[10px] font-medium">Perfil</span>
       </button>
     </nav>
     
