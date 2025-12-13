@@ -59,6 +59,9 @@
   let metas = [];
   let user = {};
 
+  // Search functionality
+  let searchTerm = '';
+
   // Auth Form
   let email = '';
   let password = '';
@@ -790,13 +793,14 @@
             <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                 <div class="flex-1 relative">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
-                    <input type="text" placeholder="Buscar..." class="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" />
+                    <input bind:value={searchTerm} type="text" placeholder="Buscar..." class="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" />
                 </div>
             </div>
-            <TransactionTable 
-                transactions={transactions} 
-                onEdit={handleEditMovimiento} 
-                onDelete={handleDeleteMovimiento} 
+            <TransactionTable
+                transactions={transactions}
+                searchTerm={searchTerm}
+                onEdit={handleEditMovimiento}
+                onDelete={handleDeleteMovimiento}
             />
         </div>
       {:else if activeTab === 'metas'}

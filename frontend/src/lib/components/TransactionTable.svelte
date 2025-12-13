@@ -2,6 +2,13 @@
   export let transactions = [];
   export let onEdit;
   export let onDelete;
+  export let searchTerm = "";
+
+  $: filteredTransactions = transactions.filter(t =>
+    t.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.nombre_categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.nombre_cuenta.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const formatDate = (dateStr) => {
     if(!dateStr) return '';
@@ -46,7 +53,8 @@
       <i class="fas fa-download mr-1"></i> Exportar CSV
     </button>
   </div>
-  <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+  <div class="overflow-y-auto max-h-[600px] border border-slate-200 dark:border-slate-700 rounded-lg">
+    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
     <thead class="bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 uppercase text-xs">
       <tr>
         <th class="px-6 py-3">Fecha</th>
@@ -58,7 +66,7 @@
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-      {#each transactions as t}
+      {#each filteredTransactions as t}
         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
           <td class="px-6 py-4">{formatDate(t.fecha)}</td>
           <td class="px-6 py-4">
@@ -83,4 +91,5 @@
       {/each}
     </tbody>
   </table>
+  </div>
 </div>

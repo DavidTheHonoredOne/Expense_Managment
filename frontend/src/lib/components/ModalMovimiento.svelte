@@ -14,88 +14,66 @@
 
   let form = {
     tipo: "gasto",
-    monto: null,
+    monto: 0, // Monto ya no se usa aquí, pero mantener para compatibilidad
     cuenta_id: 0,
     categoria_id: 0,
     fecha: new Date().toISOString().split("T")[0],
     descripcion: ""
   };
 
-  let displayMonto = "";
+  let montoVisual = ""; // Para mostrar al usuario (con formato)
+  let montoReal = 0;    // Para enviar a la API (número entero)
 
-  function formatCurrency(value) {
-    if (!value && value !== 0) return "";
-    // Convertir a número primero para manejar decimales correctamente
-    const numericValue = parseFloat(value.toString().replace(/\D/g, '')) || 0;
-
-    // Formatear SIEMPRE con puntos de miles, incluso para valores pequeños (ej: 1000 -> 1.000)
-    const formatted = new Intl.NumberFormat('es-ES', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-      useGrouping: true // Fuerza los separadores de miles
-    }).format(Math.floor(numericValue));
-
-    return formatted;
+  function handleInputMonto(e) {
+      // 1. Eliminar todo lo que no sea número
+      let rawValue = e.target.value.replace(/\D/g, '');
+      // 2. Guardar valor real (entero)
+      montoReal = rawValue ? parseInt(rawValue) : 0;
+      // 3. Formatear visualmente para el usuario
+      montoVisual = rawValue ? new Intl.NumberFormat('es-CO').format(montoReal) : "";
   }
 
-  function cleanNumericValue(value) {
-    // Limpia el valor para obtener solo números (para el backend)
-    return value.toString().replace(/\D/g, '');
-  }
+  $: if (isOpen && editingTransaction) {
+      // Carga inicial: Formatea el número crudo de la DB una sola vez
+      montoReal = editingTransaction.monto;
+      montoVisual = new Intl.NumberFormat('es-CO').format(montoReal);
 
-  $: if (isOpen) {
-    if (editingTransaction) {
-        // Asignar el valor numérico limpio (sin puntos) a form.monto
-        form.monto = parseFloat(editingTransaction.monto) || null;
-        // Formatear el valor para mostrar (con puntos)
-        displayMonto = formatCurrency(editingTransaction.monto?.toString() || "");
-        // Asignar los demás campos
-        form.tipo = editingTransaction.tipo;
-        form.cuenta_id = editingTransaction.cuenta_id;
-        form.categoria_id = editingTransaction.categoria_id;
-        form.fecha = editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
-        form.descripcion = editingTransaction.descripcion;
-    } else {
-        // Resetear el formulario cuando se abre para crear nuevo
-        form = {
-            tipo: "gasto",
-            monto: null,
-            cuenta_id: 0,
-            categoria_id: 0,
-            fecha: new Date().toISOString().split("T")[0],
-            descripcion: ""
-        };
-        displayMonto = "";
-    }
-  }
+      // Asignar los demás campos
+      form.tipo = editingTransaction.tipo;
+      form.monto = montoReal;
+      form.cuenta_id = editingTransaction.cuenta_id;
+      form.categoria_id = editingTransaction.categoria_id;
+      form.fecha = editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
+      form.descripcion = editingTransaction.descripcion;
+  } else if (isOpen && !editingTransaction) {
+      // Nuevo movimiento
+      montoVisual = "";
+      montoReal = 0;
+      form.monto = 0;
 
-  $: if (!isOpen) {
-    // Reset form when closed
-    form = {
-        tipo: "gasto",
-        monto: null,
-        cuenta_id: 0,
-        categoria_id: 0,
-        fecha: new Date().toISOString().split("T")[0],
-        descripcion: ""
-    };
+      // Asignar los demás campos por defecto
+      form.tipo = "gasto";
+      form.cuenta_id = 0;
+      form.categoria_id = 0;
+      form.fecha = new Date().toISOString().split("T")[0];
+      form.descripcion = "";
   }
 
   const handleSubmit = () => {
-    if (!form.cuenta_id || !form.categoria_id || !form.monto) {
+    if (!form.cuenta_id || !form.categoria_id || !montoReal) {
         notifications.addNotification("Por favor complete los campos obligatorios", "error");
         return;
     }
 
     const payload = {
         tipo: form.tipo,
-        monto: Number(form.monto),
+        monto: montoReal,
         cuenta_id: Number(form.cuenta_id),
         categoria_id: Number(form.categoria_id),
-        fecha: form.fecha, 
+        fecha: form.fecha,
         descripcion: form.descripcion
     };
-    
+
     onSave(payload);
   };
 </script>
@@ -135,13 +113,8 @@
           <input
             id="monto"
             type="text"
-            bind:value={displayMonto}
-            on:input={(e) => {
-              const input = /** @type {HTMLInputElement} */ (e.target);
-              const rawValue = input.value.replace(/\D/g, '');
-              form.monto = rawValue ? parseFloat(rawValue) : null;
-              displayMonto = formatCurrency(rawValue);
-            }}
+            bind:value={montoVisual}
+            on:input={handleInputMonto}
             on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold"
             placeholder="0.00"
