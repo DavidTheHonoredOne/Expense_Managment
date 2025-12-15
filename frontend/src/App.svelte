@@ -354,6 +354,8 @@
 
   async function handleSaveMovimiento(data) {
     try {
+      isDataLoading = true; // Mostrar loading global (opcional)
+
       if (editingTransaction) {
         await api.updateMovimiento(editingTransaction.movimiento_id, data);
         notifications.addNotification('Movimiento actualizado exitosamente.', 'success');
@@ -373,10 +375,15 @@
 
       // 2. Forzar recarga inmediata de la vista actual
       await loadData();
+      
+      // Cerrar modal solo si tuvo éxito
       isModalOpen = false;
       editingTransaction = null;
     } catch (e) {
       notifications.addNotification('Error al guardar movimiento: ' + (e.message || 'Desconocido'), 'error');
+      throw e; // Relanzar error para que el modal lo capture y detenga el loading
+    } finally {
+      isDataLoading = false;
     }
   }
 
@@ -432,6 +439,7 @@
       isModalCuentaOpen = false;
     } catch (e) {
       notifications.addNotification('Error al crear cuenta: ' + (e.message || 'Desconocido'), 'error');
+      throw e;
     }
   }
 
@@ -462,11 +470,12 @@
     try {
       await api.createCategoria(data);
       notifications.addNotification('Categoría creada exitosamente.', 'success');
-      isModalCategoriaOpen = false;
       needsRefresh = true;
-      loadData();
+      await loadData();
+      isModalCategoriaOpen = false;
     } catch (e) {
       notifications.addNotification('Error al crear categoría: ' + (e.message || 'Desconocido'), 'error');
+      throw e;
     }
   }
 
@@ -499,57 +508,63 @@
 
   async function handleSaveMeta(data, meta_id) {
     try {
-        if (meta_id) {
-            await api.updateMeta(meta_id, data);
-            notifications.addNotification('Meta actualizada exitosamente.', 'success');
-        } else {
-            await api.createMeta(data);
-            notifications.addNotification('Meta creada exitosamente.', 'success');
-        }
+      isDataLoading = true; // Mostrar loading
 
-        // 1. Pequeño delay de seguridad para dar tiempo a la base de datos de confirmar la transacción
-        await new Promise(resolve => setTimeout(resolve, 50));
+      if (meta_id) {
+          await api.updateMeta(meta_id, data);
+          notifications.addNotification('Meta actualizada exitosamente.', 'success');
+      } else {
+          await api.createMeta(data);
+          notifications.addNotification('Meta creada exitosamente.', 'success');
+      }
 
-        // 2. Invalidar TODA la caché relacionada para forzar actualización
-        dataCache = {
-            dashboard: null,
-            movimientos: null,
-            cuentas: null,
-            metas: null,
-            categorias: null,
-            perfil: null
-        };
+      // 1. Pequeño delay de seguridad para dar tiempo a la base de datos de confirmar la transacción
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-        // 3. Forzar recarga inmediata de la vista actual
-        await loadData();
+      // 2. Invalidar TODA la caché relacionada para forzar actualización
+      dataCache = {
+          dashboard: null,
+          movimientos: null,
+          cuentas: null,
+          metas: null,
+          categorias: null,
+          perfil: null
+      };
 
-        // 4. Verificar que la meta se haya agregado correctamente a la lista
-        // Si no está en la lista, recargar específicamente las metas
-        if (meta_id) {
-            // Para actualización, buscar la meta actualizada
-            const updatedMeta = metas.find(m => m.meta_id === meta_id);
-            if (!updatedMeta) {
-                // Si no se encontró, recargar metas específicamente (con delay adicional)
-                await new Promise(resolve => setTimeout(resolve, 100));
-                metas = await api.getMetas().catch(err => []);
-                dataCache.metas = metas;
-            }
-        } else {
-            // Para creación, verificar que la nueva meta esté en la lista
-            // Como no tenemos el ID de la nueva meta, confiamos en la recarga de loadData()
-            // Pero podemos verificar que la lista no esté vacía si debería tener elementos
-            if (metas.length === 0) {
-                // Delay adicional para creación de nuevas metas
-                await new Promise(resolve => setTimeout(resolve, 100));
-                metas = await api.getMetas().catch(err => []);
-                dataCache.metas = metas;
-            }
-        }
+      // 3. Forzar recarga inmediata de la vista actual
+      await loadData();
 
-        isModalMetaOpen = false;
-        editingMeta = null;
+      // 4. Verificar que la meta se haya agregado correctamente a la lista
+      // Si no está en la lista, recargar específicamente las metas
+      if (meta_id) {
+          // Para actualización, buscar la meta actualizada
+          const updatedMeta = metas.find(m => m.meta_id === meta_id);
+          if (!updatedMeta) {
+              // Si no se encontró, recargar metas específicamente (con delay adicional)
+              await new Promise(resolve => setTimeout(resolve, 100));
+              metas = await api.getMetas().catch(err => []);
+              dataCache.metas = metas;
+          }
+      } else {
+          // Para creación, verificar que la nueva meta esté en la lista
+          // Como no tenemos el ID de la nueva meta, confiamos en la recarga de loadData()
+          // Pero podemos verificar que la lista no esté vacía si debería tener elementos
+          if (metas.length === 0) {
+              // Delay adicional para creación de nuevas metas
+              await new Promise(resolve => setTimeout(resolve, 100));
+              metas = await api.getMetas().catch(err => []);
+              dataCache.metas = metas;
+          }
+      }
+      
+      // Cerrar modal solo si tuvo éxito
+      isModalMetaOpen = false;
+      editingMeta = null;
     } catch (e) {
-        notifications.addNotification('Error al guardar meta: ' + (e.message || 'Desconocido'), 'error');
+      notifications.addNotification('Error al guardar meta: ' + (e.message || 'Desconocido'), 'error');
+      throw e; // Relanzar error para que el modal lo capture
+    } finally {
+      isDataLoading = false;
     }
   }
   
@@ -606,6 +621,7 @@
           abonoMetaTarget = null;
       } catch (e) {
           notifications.addNotification('Error al abonar a meta: ' + (e.message || 'Desconocido'), 'error');
+          throw e;
       }
   }
 
@@ -812,6 +828,26 @@
               </div>
             {/if}
 
+            <!-- Sugerencia de Gastos -->
+            {#if !isDataLoading && transactions.length > 0}
+                {@const topGasto = transactions.filter(t => t.tipo.toLowerCase() === 'gasto').sort((a,b) => b.monto - a.monto)[0]}
+                {#if topGasto}
+                    <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r shadow-sm dark:bg-blue-900/20 dark:border-blue-400 animate-fade-in">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-blue-500"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">Sugerencia</h3>
+                                <div class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                                    <p>Hemos notado que tu mayor gasto reciente fue en <strong>{topGasto.nombre_categoria}</strong>. Considera revisar esta categoría para optimizar tus finanzas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {/if}
+            {/if}
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                     <h4 class="font-bold mb-4 text-gray-800 dark:text-white">Top Gastos por Categoría</h4>
@@ -829,6 +865,25 @@
         </div>
       {:else if activeTab === 'movimientos'}
         <div class="space-y-6" in:fly={{ y: 20, duration: 500 }}>
+            <!-- Sugerencia de Gastos -->
+            {#if !isDataLoading && transactions.length > 0}
+                {@const topGasto = transactions.filter(t => t.tipo.toLowerCase() === 'gasto').sort((a,b) => b.monto - a.monto)[0]}
+                {#if topGasto}
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r shadow-sm dark:bg-blue-900/20 dark:border-blue-400 animate-fade-in">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-blue-500"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">Sugerencia</h3>
+                                <div class="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                                    <p>Hemos notado que tu mayor gasto reciente fue en <strong>{topGasto.nombre_categoria}</strong>. Considera revisar esta categoría para optimizar tus finanzas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {/if}
+            {/if}
             <div class="flex gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
                 <div class="flex-1 relative">
                     <i class="fas fa-search absolute left-3 top-3 text-gray-400 dark:text-gray-500"></i>
@@ -852,6 +907,7 @@
                         <div>
                             <span class="bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2 py-1 rounded text-xs font-bold uppercase">Meta</span>
                             <h4 class="text-xl font-bold text-gray-900 dark:text-white mt-1 truncate max-w-[200px]" title={meta.nombre_meta}>{meta.nombre_meta}</h4>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1"><i class="far fa-calendar-alt mr-1"></i>{new Date(meta.fecha_fin).toLocaleDateString('es-CO')}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500 dark:text-gray-400">Objetivo</p>

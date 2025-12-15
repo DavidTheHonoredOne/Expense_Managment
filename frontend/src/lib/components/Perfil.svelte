@@ -91,8 +91,12 @@
                     <input id="email-profile" type="email" bind:value={email} class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none transition-colors" required>
                 </div>
                 <div class="pt-2">
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-medium shadow-md shadow-emerald-500/20 transition-all hover:scale-[1.02]">
-                        Guardar Cambios
+                    <button type="submit" disabled={isLoading} class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-medium shadow-md shadow-emerald-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed">
+                        {#if isLoading}
+                            <i class="fas fa-spinner fa-spin mr-2"></i> Guardando...
+                        {:else}
+                            Guardar Cambios
+                        {/if}
                     </button>
                 </div>
             </form>
@@ -127,8 +131,12 @@
             </div>
         </div>
         <div class="pt-2">
-            <button type="submit" class="bg-gray-700 hover:bg-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium shadow-md transition-all hover:scale-[1.02]">
-                Cambiar Contraseña
+            <button type="submit" disabled={isLoading} class="bg-gray-700 hover:bg-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium shadow-md transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed">
+                {#if isLoading}
+                    <i class="fas fa-spinner fa-spin mr-2"></i> Cambiando...
+                {:else}
+                    Cambiar Contraseña
+                {/if}
             </button>
         </div>
     </form>

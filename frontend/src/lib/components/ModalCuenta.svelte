@@ -7,24 +7,79 @@
   let nombre_cuenta = "";
   let saldo_inicial = "";
   let tipo = "Banco";
+  let isSubmitting = false;
+
+  // Límites de validación
+  const MAX_SALDO = 999999999; // 999 millones COP
+  const MIN_SALDO = 1000; // 1000 COP
 
   $: if (!isOpen) {
     nombre_cuenta = "";
     saldo_inicial = "";
     tipo = "Banco";
+    isSubmitting = false;
   }
 
-  const handleSubmit = () => {
+  function validateSaldo(saldo) {
+    if (!saldo) return { valid: false, message: 'El saldo es requerido' };
+    
+    const numericSaldo = parseFloat(saldo.toString().replace(/[^0-9]/g, ''));
+    
+    if (isNaN(numericSaldo)) {
+      return { valid: false, message: 'El saldo debe ser un número válido' };
+    }
+    
+    if (numericSaldo < MIN_SALDO) {
+      return { valid: false, message: `El saldo mínimo es $${MIN_SALDO.toLocaleString('es-CO')} COP` };
+    }
+    
+    if (numericSaldo > MAX_SALDO) {
+      return { valid: false, message: `El saldo máximo es $${MAX_SALDO.toLocaleString('es-CO')} COP` };
+    }
+    
+    return { valid: true };
+  }
+
+  const handleSubmit = async () => {
     if (!nombre_cuenta) {
         notifications.addNotification("Nombre requerido", "error");
         return;
     }
-    onSave({ 
-        nombre_cuenta, 
-        saldo_inicial: parseFloat(saldo_inicial) || 0,
-        tipo
-    });
+    
+    const validation = validateSaldo(saldo_inicial);
+    if (!validation.valid) {
+        notifications.addNotification(validation.message, "error");
+        return;
+    }
+    
+    isSubmitting = true;
+    try {
+      const saldoNumerico = parseFloat(saldo_inicial.replace(/[^0-9]/g, ''));
+      await onSave({ 
+          nombre_cuenta, 
+          saldo_inicial: saldoNumerico,
+          tipo
+      });
+    } catch (e) {
+      isSubmitting = false;
+    }
   };
+
+  // Formatear entrada de saldo en tiempo real
+  function handleSaldoInput(event) {
+    const input = /** @type {HTMLInputElement} */ (event.target);
+    let value = input.value.replace(/[^0-9]/g, '');
+    
+    if (value) {
+      const numericValue = parseInt(value);
+      // Validar que no exceda el máximo
+      if (numericValue <= MAX_SALDO) {
+        saldo_inicial = new Intl.NumberFormat('es-CO').format(numericValue);
+      }
+    } else {
+      saldo_inicial = '';
+    }
+  }
 </script>
 
 {#if isOpen}
@@ -48,17 +103,20 @@
         </div>
         
         <div>
-          <label for="acc-balance" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Saldo Inicial ($)</label>
+          <label for="acc-balance" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+            Saldo Inicial ($)
+            <span class="text-xs text-gray-500 block">
+              (Min: ${MIN_SALDO.toLocaleString('es-CO')} - Max: ${MAX_SALDO.toLocaleString('es-CO')})
+            </span>
+          </label>
           <input 
             id="acc-balance"
-            type="number" 
-            min="0" 
-            step="0.01"
+            type="text" 
             bind:value={saldo_inicial} 
-            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); saldo_inicial = Math.abs(parseFloat(input.value)).toString(); }}
-            on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
+            on:input={handleSaldoInput}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none" 
-            placeholder="0.00"
+            placeholder="0"
+            required
           >
         </div>
 
@@ -77,9 +135,15 @@
 
         <button 
             type="submit" 
-            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
+            disabled={isSubmitting}
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-            Crear Cuenta
+            {#if isSubmitting}
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Guardando...
+            {:else}
+                Crear Cuenta
+            {/if}
         </button>
       </form>
     </div>

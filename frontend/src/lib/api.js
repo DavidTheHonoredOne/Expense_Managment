@@ -28,17 +28,16 @@ export async function request(endpoint, method = 'GET', body = null) {
   }
 
   try {
-    const res = await fetch(`${API_URL}${endpoint}`, config);
-    if (!res.ok) {
-        if (res.status === 401) {
-            console.warn('Unauthorized access');
-        }
-        const errorData = await res.json().catch(() => ({}));
-        throw new ApiError(errorData.detail || `Error ${res.status}`, res.status);
+    const response = await fetch(`${API_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new ApiError(data.detail || `HTTP error! status: ${response.status}`, response.status);
     }
-    return await res.json();
+    
+    return data;
   } catch (error) {
-    console.error('API Request Error:', error);
+    console.error("API Request Error:", error.message || "An unexpected error occurred.");
     throw error;
   }
 }

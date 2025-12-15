@@ -8,6 +8,10 @@ import datetime # Import datetime
 
 router = APIRouter(prefix="/cuentas", tags=["cuentas"])
 
+# Límites de validación
+MAX_SALDO = 999999999  # 999 millones COP
+MIN_SALDO = 0 # 1000 COP
+
 @router.get("/", response_model=List[schemas.Cuenta])
 def obtener_cuentas(
     db: Session = Depends(get_db),
@@ -21,6 +25,19 @@ def crear_cuenta(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(security.get_current_user)
 ):
+    # Validación de montos grandes en el backend
+    if cuenta.saldo_inicial < MIN_SALDO:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El saldo mínimo es ${MIN_SALDO:,} COP"
+        )
+    
+    if cuenta.saldo_inicial > MAX_SALDO:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El saldo máximo es ${MAX_SALDO:,} COP"
+        )
+
     nueva_cuenta = models.Cuenta(
         nombre_cuenta=cuenta.nombre_cuenta,
         usuario_id=current_user.usuario_id,

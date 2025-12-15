@@ -10,6 +10,7 @@
   let monto_objetivo = "";
   let displayMontoObjetivo = "";
   let fecha_fin = new Date().toISOString().split("T")[0];
+  let isSubmitting = false; // Prevenir múltiples clicks
 
   // FIX(UX): Implement input masking for COP currency (Sprint 4)
   function formatCurrency(value) {
@@ -39,13 +40,17 @@
         displayMontoObjetivo = "";
         fecha_fin = new Date().toISOString().split("T")[0];
     }
+  } else {
+      isSubmitting = false; // Resetear siempre al cerrar
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!nombre_meta || !monto_objetivo || !fecha_fin) {
         notifications.addNotification("Por favor complete los campos obligatorios", "error");
         return;
     }
+
+    isSubmitting = true;
 
     const payload = {
         nombre_meta,
@@ -53,7 +58,11 @@
         fecha_fin
     };
     
-    onSave(payload, editingMeta ? editingMeta.meta_id : null);
+    try {
+        await onSave(payload, editingMeta ? editingMeta.meta_id : null);
+    } catch (e) {
+        isSubmitting = false;
+    }
   };
 </script>
 
@@ -108,11 +117,17 @@
           >
         </div>
 
-        <button 
-            type="submit" 
-            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]"
+        <button
+            type="submit"
+            disabled={isSubmitting}
+            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-            {editingMeta ? "Guardar Cambios" : "Crear Meta"}
+            {#if isSubmitting}
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Guardando...
+            {:else}
+                {editingMeta ? "Guardar Cambios" : "Crear Meta"}
+            {/if}
         </button>
       </form>
     </div>

@@ -6,18 +6,24 @@
 
   let nombre_categoria = "";
   let tipo = "Gasto";
+  let isSubmitting = false;
 
   $: if (!isOpen) {
     nombre_categoria = "";
     tipo = "Gasto";
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!nombre_categoria) {
         notifications.addNotification("Nombre requerido", "error");
         return;
     }
-    onSave({ nombre_categoria, tipo });
+    isSubmitting = true;
+    try {
+      await onSave({ nombre_categoria, tipo });
+    } catch (e) {
+      isSubmitting = false;
+    }
   };
 </script>
 
@@ -63,9 +69,15 @@
 
         <button 
             type="submit" 
-            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
+            disabled={isSubmitting}
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-            Crear Categoría
+            {#if isSubmitting}
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Guardando...
+            {:else}
+                Crear Categoría
+            {/if}
         </button>
       </form>
     </div>

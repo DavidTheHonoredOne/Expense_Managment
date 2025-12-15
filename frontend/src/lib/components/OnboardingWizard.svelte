@@ -5,24 +5,116 @@
 
   const dispatch = createEventDispatcher();
 
+  // Estado persistente en localStorage
+  const ONBOARDING_STORAGE_KEY = 'ems_onboarding_state';
+  
   let step = 1;
   let newAccount = {
     nombre_cuenta: '',
-    saldo_inicial: null
+    saldo_inicial: ""
   };
 
-  function handleCreateAccount() {
-    if (newAccount.nombre_cuenta && newAccount.saldo_inicial > 0) {
-      dispatch('createAccount', newAccount);
-      step = 3;
-    } else {
-      notifications.addNotification('Por favor, ingresa un nombre y un saldo inicial mayor a cero.', 'error');
+  // Cargar estado persistente al inicializar
+  function loadState() {
+    try {
+      const saved = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (saved) {
+        const state = JSON.parse(saved);
+        step = state.step || 1;
+        newAccount = state.newAccount || newAccount;
+      }
+    } catch (e) {
+      console.warn('Error loading onboarding state:', e);
     }
+  }
+
+  // Guardar estado persistente
+  function saveState() {
+    try {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({
+        step,
+        newAccount
+      }));
+    } catch (e) {
+      console.warn('Error saving onboarding state:', e);
+    }
+  }
+
+  // Limpiar estado al completar
+  function clearState() {
+    try {
+      localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    } catch (e) {
+      console.warn('Error clearing onboarding state:', e);
+    }
+  }
+
+  // Auto-guardar estado cuando cambie
+  $: {
+    if (typeof step !== 'undefined') {
+      saveState();
+    }
+  }
+
+  // Cargar estado al montar el componente
+  loadState();
+
+  // Validación de montos grandes
+  const MAX_SALDO = 999999999; // 999 millones COP
+  const MIN_SALDO = 1000; // 1000 COP
+
+  function validateSaldo(saldo) {
+    if (!saldo) return { valid: false, message: 'El saldo es requerido' };
+    
+    const numericSaldo = parseFloat(saldo.toString().replace(/[^0-9]/g, ''));
+    
+    if (isNaN(numericSaldo)) {
+      return { valid: false, message: 'El saldo debe ser un número válido' };
+    }
+    
+    if (numericSaldo < MIN_SALDO) {
+      return { valid: false, message: `El saldo mínimo es $${MIN_SALDO.toLocaleString('es-CO')} COP` };
+    }
+    
+    if (numericSaldo > MAX_SALDO) {
+      return { valid: false, message: `El saldo máximo es $${MAX_SALDO.toLocaleString('es-CO')} COP` };
+    }
+    
+    return { valid: true };
+  }
+
+  function handleCreateAccount() {
+    const saldo = newAccount.saldo_inicial.replace(/[^0-9]/g, '');
+    const validation = validateSaldo(saldo);
+    
+    if (!validation.valid) {
+      notifications.addNotification(validation.message, 'error');
+      return;
+    }
+
+    if (!newAccount.nombre_cuenta.trim()) {
+      notifications.addNotification('El nombre de la cuenta es requerido', 'error');
+      return;
+    }
+
+    const saldoNumerico = parseInt(saldo, 10);
+    
+    dispatch('createAccount', { 
+      ...newAccount, 
+      saldo_inicial: saldoNumerico 
+    });
+    
+    step = 3;
   }
 
   function handleGenerateCategories() {
     dispatch('generateCategories');
     step = 4;
+  }
+
+  function handleComplete() {
+    clearState();
+    dispatch("complete");
   }
 </script>
 
@@ -62,10 +154,29 @@
             </div>
           </div>
           <div>
-            <label for="initial-balance" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Saldo Inicial</label>
+            <label for="initial-balance" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Saldo Inicial 
+              <span class="text-xs text-gray-500">
+                (Min: ${MIN_SALDO.toLocaleString('es-CO')} - Max: ${MAX_SALDO.toLocaleString('es-CO')})
+              </span>
+            </label>
             <div class="relative">
                 <i class="fas fa-dollar-sign absolute left-4 top-4 text-gray-400"></i>
-                <input id="initial-balance" type="number" bind:value={newAccount.saldo_inicial} class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-12 pr-4 py-3.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all" placeholder="0">
+                <input id="initial-balance" type="text" bind:value={newAccount.saldo_inicial} 
+                       on:input={(e) => {
+                           const input = /** @type {HTMLInputElement} */ (e.target);
+                           let value = input.value.replace(/[^0-9]/g, '');
+                           if (value) {
+                             // Validar que no exceda el máximo
+                             const numericValue = parseInt(value);
+                             if (numericValue <= MAX_SALDO) {
+                               newAccount.saldo_inicial = new Intl.NumberFormat('es-CO').format(numericValue);
+                             }
+                           } else {
+                             newAccount.saldo_inicial = '';
+                           }
+                       }}
+                       class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl pl-12 pr-4 py-3.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all" placeholder="0">
             </div>
           </div>
         </div>
@@ -104,7 +215,7 @@
         <p class="text-gray-600 dark:text-gray-300 mb-8">
           Tu cuenta ha sido creada. Ya puedes empezar a registrar tus gastos e ingresos.
         </p>
-        <button on:click={() => dispatch("complete")} class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-500 transition-all">
+        <button on:click={handleComplete} class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-500 transition-all">
           Ir al Dashboard
         </button>
       </div>

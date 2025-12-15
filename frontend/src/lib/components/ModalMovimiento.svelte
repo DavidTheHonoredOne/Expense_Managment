@@ -19,9 +19,13 @@
     fecha: new Date().toISOString().split("T")[0],
     descripcion: ""
   };
+  
+  // CORRECCIÓN: Excluir todas las categorías que empiecen con "Meta: " además de "Abono a Meta"
+  $: filteredCategorias = categorias.filter(c => !c.nombre_categoria.startsWith('Meta: ') && c.nombre_categoria !== 'Abono a Meta');
 
   let montoVisual = ""; // Lo que se ve (ej: "10.000")
   let montoReal = 0;    // Lo que se envía a la API (ej: 10000)
+  let isSubmitting = false; // Prevenir múltiples clicks
 
   // Detectar cambio de apertura
   let wasOpen = false;
@@ -31,12 +35,13 @@
   } else if (!isOpen && wasOpen) {
       wasOpen = false;
       resetForm();
+      isSubmitting = false; // Resetear loading state al cerrar
   }
 
   function initializeForm() {
       if (editingTransaction) {
           // Cargar datos existentes
-          form.tipo = editingTransaction.tipo;
+          form.tipo = editingTransaction.tipo || "gasto"; // Mantener valor original (case-sensitive) para validación backend
           montoReal = editingTransaction.monto;
           montoVisual = new Intl.NumberFormat('es-CO').format(montoReal);
           form.cuenta_id = editingTransaction.cuenta_id;
@@ -79,11 +84,13 @@
       event.target.value = montoVisual;
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.cuenta_id || !form.categoria_id || !montoReal) {
         notifications.addNotification("Por favor complete los campos obligatorios", "error");
         return;
     }
+
+    isSubmitting = true;
 
     const payload = {
         tipo: form.tipo,
@@ -94,7 +101,11 @@
         descripcion: form.descripcion
     };
 
-    onSave(payload);
+    try {
+        await onSave(payload);
+    } catch (e) {
+        isSubmitting = false;
+    }
   };
 </script>
 
@@ -111,7 +122,7 @@
           <div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {form.tipo === "gasto" ? "bg-rose-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                class="py-2 rounded-md font-medium text-sm transition {form.tipo.toLowerCase() === "gasto" ? "bg-rose-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
                 on:click={() => form.tipo = "gasto"}
                 disabled={isMetaTransaction}
             >
@@ -119,7 +130,7 @@
             </button>
             <button 
                 type="button" 
-                class="py-2 rounded-md font-medium text-sm transition {form.tipo === "ingreso" ? "bg-teal-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
+                class="py-2 rounded-md font-medium text-sm transition {form.tipo.toLowerCase() === "ingreso" ? "bg-teal-500 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}"
                 on:click={() => form.tipo = "ingreso"}
                 disabled={isMetaTransaction}
             >
@@ -167,7 +178,7 @@
                 required
             >
               <option value={0} disabled>Seleccionar...</option>
-              {#each categorias as cat}
+              {#each filteredCategorias as cat}
                 <option value={cat.categoria_id}>{cat.nombre_categoria}</option>
               {/each}
             </select>
@@ -196,11 +207,17 @@
           >
         </div>
 
-        <button 
-            type="submit" 
-            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20"
+        <button
+            type="submit"
+            disabled={isSubmitting}
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-            {editingTransaction ? "Actualizar Transacción" : "Guardar Transacción"}
+            {#if isSubmitting}
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Guardando...
+            {:else}
+                {editingTransaction ? "Actualizar Transacción" : "Guardar Transacción"}
+            {/if}
         </button>
       </form>
     </div>

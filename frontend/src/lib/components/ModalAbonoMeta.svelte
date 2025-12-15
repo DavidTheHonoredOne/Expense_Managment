@@ -9,18 +9,20 @@
 
   let monto = null;
   let cuenta_id = 0; // New state for selected account
+  let isSubmitting = false;
 
   $: if (!isOpen) {
-    monto = null;
+    monto = "";
     cuenta_id = 0; // Reset account selection
+    isSubmitting = false;
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!meta) {
         notifications.addNotification("Error: No se ha seleccionado una meta.", "error");
         return;
     }
-    if (!monto || monto <= 0) {
+    if (!monto || monto.trim() === "") {
         notifications.addNotification("Por favor ingrese un monto válido", "error");
         return;
     }
@@ -28,7 +30,19 @@
         notifications.addNotification("Por favor seleccione una cuenta de origen.", "error");
         return;
     }
-    onSave(meta.meta_id, { monto: Number(monto), cuenta_id: Number(cuenta_id) });
+    isSubmitting = true;
+    try {
+      // CORRECCIÓN: usar parseInt y manejar correctamente los puntos separadores de miles
+      const montoNumerico = parseInt(monto.replace(/\./g, '').replace(/[^0-9]/g, ''), 10);
+      if (isNaN(montoNumerico) || montoNumerico <= 0) {
+        notifications.addNotification("Por favor ingrese un monto válido", "error");
+        isSubmitting = false;
+        return;
+      }
+      await onSave(meta.meta_id, { monto: montoNumerico, cuenta_id: Number(cuenta_id) });
+    } catch (e) {
+      isSubmitting = false;
+    }
   };
 </script>
 
@@ -49,14 +63,19 @@
           <label for="abono-monto" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Monto ($)</label>
           <input 
             id="abono-monto"
-            type="number" 
-            min="0" 
-            step="0.01"
+            type="text" 
             bind:value={monto} 
-            on:input={(e) => { const input = /** @type {HTMLInputElement} */ (e.target); monto = Math.abs(parseFloat(input.value)).toString(); }}
-            on:keydown={(e) => { if (e.keyCode === 69 || e.keyCode === 189) e.preventDefault(); }}
+            on:input={(e) => {
+                const input = /** @type {HTMLInputElement} */ (e.target);
+                let value = input.value.replace(/[^0-9]/g, '');
+                if (value) {
+                    monto = new Intl.NumberFormat('es-CO').format(parseInt(value));
+                } else {
+                    monto = '';
+                }
+            }}
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white focus:border-emerald-500 focus:outline-none text-lg font-bold" 
-            placeholder="0.00"
+            placeholder="0"
             required
           >
         </div>
@@ -78,9 +97,15 @@
 
         <button 
             type="submit" 
-            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
+            disabled={isSubmitting}
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-            Confirmar Abono
+            {#if isSubmitting}
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Procesando...
+            {:else}
+                Confirmar Abono
+            {/if}
         </button>
       </form>
     </div>
