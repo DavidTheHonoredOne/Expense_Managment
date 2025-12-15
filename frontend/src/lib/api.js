@@ -32,12 +32,19 @@ export async function request(endpoint, method = 'GET', body = null) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new ApiError(data.detail || `HTTP error! status: ${response.status}`, response.status);
+      throw new ApiError(data.detail || `Error del servidor (${response.status})`, response.status);
     }
     
     return data;
   } catch (error) {
-    console.error("API Request Error:", error.message || "An unexpected error occurred.");
+    // ENMASCARAR URL EN MENSAJES DE ERROR PARA SEGURIDAD
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      console.error("Error de conexión: Revisa tu conexión a internet", error);
+    } else if (error instanceof ApiError) {
+      console.error(`Error API ${error.status}: ${error.message}`, error);
+    } else {
+      console.error("Error inesperado en la aplicación", error);
+    }
     throw error;
   }
 }
@@ -56,8 +63,11 @@ export const api = {
         },
         body: formData
     }).then(async res => {
-        if (!res.ok) throw new Error('Login failed');
+        if (!res.ok) throw new Error('Error en el inicio de sesión');
         return res.json();
+    }).catch(error => {
+      console.error("Error de autenticación", error);
+      throw error;
     });
   },
   register: (user) => request('/usuarios', 'POST', user),
